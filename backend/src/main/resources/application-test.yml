@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: university-course-management
+  
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    h2:
+      console:
+        enabled: true
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+        use_sql_comments: true
+  
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+logging:
+  level:
+    com.university.backend: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+app:
+  jwt:
+    secret: aVeryLongAndComplexSecretKeyForJWT_HS512SigningThatIsAtLeast64CharactersLongAndRandomlyGenerated1234567890ABCDEF
+    expiration: 86400000 # 24 hours
+    refresh-expiration: 604800000 # 7 days
+  cors:
+    allowed-origins: http://localhost:3000
+
+# API Documentation
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method

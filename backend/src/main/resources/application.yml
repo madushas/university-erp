@@ -3,9 +3,9 @@ spring:
     name: university-course-management
   
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/university_db}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/postgres}
     username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:password}
+    password: ${DATABASE_PASSWORD:12345}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -16,8 +16,8 @@ spring:
   
   jpa:
     hibernate:
-      ddl-auto: validate
-    show-sql: ${SHOW_SQL:false}
+      ddl-auto: create-drop
+    show-sql: ${SHOW_SQL:true}
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -25,9 +25,7 @@ spring:
         use_sql_comments: true
   
   flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
+    enabled: false
 
 server:
   port: 8080
@@ -52,7 +50,7 @@ logging:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:mySecretKey12345678901234567890123456789012345678901234567890}
+    secret: ${JWT_SECRET:aVeryLongAndComplexSecretKeyForJWT_HS512SigningThatIsAtLeast64CharactersLongAndRandomlyGenerated1234567890ABCDEF}
     expiration: ${JWT_EXPIRATION:86400000} # 24 hours
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
   cors:
