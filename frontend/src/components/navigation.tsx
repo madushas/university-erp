@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button'
 import { 
   HomeIcon, 
   BookOpenIcon, 
-  UserGroupIcon, 
   ClipboardDocumentListIcon,
+  ChartBarIcon,
   Bars3Icon,
   XMarkIcon,
   UserCircleIcon 
@@ -26,9 +26,7 @@ export default function Navigation({ children }: NavigationProps) {
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Courses', href: '/courses', icon: BookOpenIcon },
     { name: 'Registrations', href: '/registrations', icon: ClipboardDocumentListIcon },
-    ...(user?.role === 'ADMIN' ? [
-      { name: 'Users', href: '/users', icon: UserGroupIcon },
-    ] : []),
+    ...(user?.role === 'ADMIN' ? [{ name: 'Analytics', href: '/analytics', icon: ChartBarIcon }] : []),
   ]
 
   const handleLogout = () => {

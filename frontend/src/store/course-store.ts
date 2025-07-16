@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { Course, CourseCreateRequest, PaginatedResponse } from '@/types'
-import apiClient from '@/lib/api-client'
+import { Course, CourseCreateRequest } from '@/types'
+import { optimizedApiService } from '@/services/optimized-api-service'
 
 interface CourseState {
   courses: Course[]
@@ -22,7 +22,7 @@ interface CourseActions {
   setLoading: (loading: boolean) => void
 }
 
-export const useCourseStore = create<CourseState & CourseActions>()((set, get) => ({
+export const useCourseStore = create<CourseState & CourseActions>()((set) => ({
   // Initial state
   courses: [],
   currentCourse: null,
@@ -36,10 +36,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
     try {
       set({ isLoading: true, error: null })
       
-      const response = await apiClient.get<PaginatedResponse<Course>>('/courses', {
-        page,
-        size,
-      })
+      const response = await optimizedApiService.getCourses(page, size)
       
       set({
         courses: response.content,
@@ -47,8 +44,8 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
         currentPage: response.number,
         isLoading: false,
       })
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to fetch courses'
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch courses'
       set({
         error: errorMessage,
         isLoading: false,
@@ -60,14 +57,15 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
     try {
       set({ isLoading: true, error: null })
       
-      const course = await apiClient.get<Course>(`/courses/${id}`)
+      const course = await optimizedApiService.getCourseById(id)
       
       set({
         currentCourse: course,
         isLoading: false,
       })
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to fetch course'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message)
+        ? error.message : 'Failed to fetch course'
       set({
         error: errorMessage,
         isLoading: false,
@@ -79,7 +77,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
     try {
       set({ isLoading: true, error: null })
       
-      const course = await apiClient.post<Course>('/courses', courseData)
+      const course = await optimizedApiService.createCourse(courseData)
       
       // Add new course to the list
       set((state) => ({
@@ -88,8 +86,9 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
       }))
       
       return course
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to create course'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message)
+        ? error.message : 'Failed to create course'
       set({
         error: errorMessage,
         isLoading: false,
@@ -102,7 +101,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
     try {
       set({ isLoading: true, error: null })
       
-      const updatedCourse = await apiClient.put<Course>(`/courses/${id}`, courseData)
+      const updatedCourse = await optimizedApiService.updateCourse(id, courseData)
       
       // Update course in the list
       set((state) => ({
@@ -114,8 +113,9 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
       }))
       
       return updatedCourse
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to update course'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message)
+        ? error.message : 'Failed to update course'
       set({
         error: errorMessage,
         isLoading: false,
@@ -128,7 +128,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
     try {
       set({ isLoading: true, error: null })
       
-      await apiClient.delete(`/courses/${id}`)
+      await optimizedApiService.deleteCourse(id)
       
       // Remove course from the list
       set((state) => ({
@@ -136,8 +136,10 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
         currentCourse: state.currentCourse?.id === id ? null : state.currentCourse,
         isLoading: false,
       }))
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to delete course'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message
+        ? error.message : 'Failed to delete course'
+      )
       set({
         error: errorMessage,
         isLoading: false,
@@ -150,18 +152,23 @@ export const useCourseStore = create<CourseState & CourseActions>()((set, get) =
     try {
       set({ isLoading: true, error: null })
       
-      const response = await apiClient.get<PaginatedResponse<Course>>('/courses/search', {
-        query,
-      })
+      // For now, use client-side filtering
+      const response = await optimizedApiService.getCourses(0, 100) // Get more courses for search
+      const filteredCourses = response.content.filter(course =>
+        course.title.toLowerCase().includes(query.toLowerCase()) ||
+        course.code.toLowerCase().includes(query.toLowerCase()) ||
+        course.instructor.toLowerCase().includes(query.toLowerCase())
+      )
       
       set({
-        courses: response.content,
-        totalPages: response.totalPages,
-        currentPage: response.number,
+        courses: filteredCourses,
+        totalPages: 1,
+        currentPage: 0,
         isLoading: false,
       })
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to search courses'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message)
+        ? error.message : 'Failed to search courses'
       set({
         error: errorMessage,
         isLoading: false,

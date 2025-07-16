@@ -1,17 +1,45 @@
-# University Course Management System
+# University ERP System
 
-A comprehensive ERP system for managing course offerings, student registrations, and academic results.
+A comprehensive Enterprise Resource Planning (ERP) system built for university course management with modern web technologies.
 
-## 🏗️ Architecture
+## Features
 
-- **Backend**: Spring Boot 3.2.0 with Java 17+
-- **Frontend**: Next.js 14 with TypeScript
-- **Database**: PostgreSQL 16
-- **Authentication**: JWT with refresh tokens
+### Core Functionality
+- **User Management**: Students, Instructors, and Admin roles with secure authentication
+- **Course Management**: Complete course creation, enrollment, and management
+- **Registration System**: Student course registration with payment tracking
+- **Analytics Dashboard**: Real-time insights and reporting
+- **Department Management**: Multi-department support with analytics
+
+### Technical Features
+- **Secure Authentication**: JWT-based auth with refresh tokens
+- **Real-time Analytics**: Interactive dashboards with charts
+- **Responsive Design**: Mobile-first approach with modern UI
+- **Performance Optimized**: Smart caching and optimized API calls
+- **Error Handling**: Comprehensive error boundary and recovery
+- **Toast Notifications**: User-friendly feedback system
+
+## Technology Stack
+
+### Backend
+- **Spring Boot 3.5.3** - Main framework
+- **PostgreSQL** - Database
+- **Spring Security** - Authentication & Authorization
+- **Spring Data JPA** - Data access layer
+- **Flyway** - Database migrations
+- **Maven** - Build tool
+
+### Frontend
+- **Next.js 15.4.1** - React framework
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **Zustand** - State management
+- **Recharts** - Data visualization
+- **React Hook Form** - Form handling
 - **Package Manager**: pnpm
 - **Containerization**: Docker & Docker Compose
 
-## 🚀 Features
+## Features
 
 - ✅ User authentication and authorization
 - ✅ Role-based access control (Student/Admin)
@@ -23,7 +51,7 @@ A comprehensive ERP system for managing course offerings, student registrations,
 - ✅ Comprehensive testing
 - ✅ CI/CD pipeline ready
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 erp-app/
@@ -43,7 +71,7 @@ erp-app/
 └── docs/                   # Documentation
 ```
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### Prerequisites
 
@@ -79,7 +107,7 @@ erp-app/
    docker-compose up -d
    ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Production Deployment
 - Backend: Deployed on Azure App Service
@@ -103,13 +131,13 @@ NEXT_PUBLIC_API_URL=http://localhost:8080/api
 NEXT_PUBLIC_APP_NAME=University Course Management
 ```
 
-## 📚 API Documentation
+## API Documentation
 
 Once the backend is running, visit:
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - API Docs: http://localhost:8080/v3/api-docs
 
-## 🧪 Testing
+## Testing
 
 ### Backend Testing
 ```bash
@@ -123,7 +151,7 @@ cd frontend
 pnpm test
 ```
 
-## 🔐 Security Features
+## Security Features
 
 - JWT authentication with refresh tokens
 - Password encryption with BCrypt
@@ -132,25 +160,25 @@ pnpm test
 - Role-based authorization
 - SQL injection protection
 
-## 🎯 Development Milestones
+## Development Milestones
 
 - [x] Project initialization and setup
-- [ ] Backend API development
-- [ ] Database setup and migrations
-- [ ] Authentication and authorization
-- [ ] Frontend development
+- [x] Backend API development
+- [x] Database setup and migrations
+- [x] Authentication and authorization
+- [x] Frontend development
 - [ ] Integration testing
 - [ ] Deployment configuration
 - [ ] Performance optimization
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👥 Contributors
+## Contributors
 
 - [Your Name] - Initial development
 
-## 📞 Support
+## Support
 
 For support, email [your-email] or create an issue in this repository.

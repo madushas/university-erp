@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useCourseStore } from '@/store/course-store'
 import { useRegistrationStore } from '@/store/registration-store'
+import { useToast } from '@/components/ui/toast-provider'
+import { Course } from '@/types'
 import ProtectedRoute from '@/components/protected-route'
 import Navigation from '@/components/navigation'
 import CourseForm from '@/components/forms/course-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatDate } from '@/lib/utils'
 import { 
   PlusIcon, 
   MagnifyingGlassIcon,
@@ -21,6 +22,7 @@ import {
 
 export default function CoursesPage() {
   const { user } = useAuthStore()
+  const { success, error: showError } = useToast()
   const { 
     courses, 
     isLoading, 
@@ -31,17 +33,24 @@ export default function CoursesPage() {
   } = useCourseStore()
   const { 
     enrollInCourse, 
+    fetchMyRegistrations,
+    isEnrolledInCourse,
     error: registrationError, 
     clearError: clearRegistrationError 
   } = useRegistrationStore()
   
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [enrollingCourseId, setEnrollingCourseId] = useState<number | null>(null)
 
   useEffect(() => {
     fetchCourses()
-  }, [fetchCourses])
+    // For students, also fetch their registrations to check enrollment status
+    if (user?.role === 'STUDENT') {
+      fetchMyRegistrations()
+    }
+  }, [fetchCourses, fetchMyRegistrations, user?.role])
 
   useEffect(() => {
     if (error) {
@@ -56,11 +65,22 @@ export default function CoursesPage() {
     try {
       setEnrollingCourseId(courseId)
       clearRegistrationError()
+      
       await enrollInCourse(courseId)
+      
       // Refresh courses to update enrollment counts
       await fetchCourses()
+      
+      // Refresh user's registrations to update enrollment status
+      if (user?.role === 'STUDENT') {
+        await fetchMyRegistrations()
+      }
+      
+      success('Successfully enrolled in the course!')
+      
     } catch (error) {
       console.error('Enrollment failed:', error)
+      showError('Failed to enroll in course', 'Please try again or contact support')
     } finally {
       setEnrollingCourseId(null)
     }
@@ -70,14 +90,16 @@ export default function CoursesPage() {
     if (window.confirm('Are you sure you want to delete this course?')) {
       try {
         await deleteCourse(courseId)
+        success('Course deleted successfully')
       } catch (error) {
         console.error('Delete failed:', error)
+        showError('Failed to delete course', 'Please try again or contact support')
       }
     }
   }
 
   const filteredCourses = courses.filter(course =>
-    course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
     course.instructor.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -146,6 +168,22 @@ export default function CoursesPage() {
             </div>
           )}
 
+          {/* Edit Form Modal */}
+          {editingCourse && (
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+              <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+                <CourseForm
+                  course={editingCourse}
+                  onSuccess={() => {
+                    setEditingCourse(null)
+                    fetchCourses()
+                  }}
+                  onCancel={() => setEditingCourse(null)}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Search */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -176,7 +214,7 @@ export default function CoursesPage() {
                     <div>
                       <CardTitle className="text-lg">{course.code}</CardTitle>
                       <CardDescription className="font-medium text-gray-900">
-                        {course.name}
+                        {course.title}
                       </CardDescription>
                     </div>
                     <div className="text-sm text-gray-500">
@@ -197,12 +235,12 @@ export default function CoursesPage() {
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
                         <AcademicCapIcon className="h-4 w-4 mr-2" />
-                        <span>Capacity: {course.capacity} students</span>
+                        <span>Capacity: {course.enrolledStudents || 0}/{course.maxStudents} students</span>
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
                         <CalendarIcon className="h-4 w-4 mr-2" />
                         <span>
-                          {formatDate(course.startDate)} - {formatDate(course.endDate)}
+                          {course.schedule}
                         </span>
                       </div>
                     </div>
@@ -210,14 +248,27 @@ export default function CoursesPage() {
                     {/* Action Buttons */}
                     <div className="flex gap-2 pt-4">
                       {user?.role === 'STUDENT' && (
-                        <Button
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleEnroll(course.id)}
-                          disabled={enrollingCourseId === course.id}
-                        >
-                          {enrollingCourseId === course.id ? 'Enrolling...' : 'Enroll'}
-                        </Button>
+                        <>
+                          {isEnrolledInCourse(course.id) ? (
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              variant="outline"
+                              disabled
+                            >
+                              Already Enrolled
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => handleEnroll(course.id)}
+                              disabled={enrollingCourseId === course.id}
+                            >
+                              {enrollingCourseId === course.id ? 'Enrolling...' : 'Enroll'}
+                            </Button>
+                          )}
+                        </>
                       )}
                       
                       {user?.role === 'ADMIN' && (
@@ -226,6 +277,7 @@ export default function CoursesPage() {
                             size="sm"
                             variant="outline"
                             className="flex-1"
+                            onClick={() => setEditingCourse(course)}
                           >
                             Edit
                           </Button>
@@ -251,11 +303,15 @@ export default function CoursesPage() {
               <AcademicCapIcon className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No courses found</h3>
               <p className="mt-1 text-sm text-gray-500">
-                {searchQuery 
-                  ? 'Try adjusting your search criteria.'
-                  : user?.role === 'ADMIN' 
-                    ? 'Get started by creating a new course.' 
-                    : 'No courses are currently available.'}
+                {(() => {
+                  if (searchQuery) {
+                    return 'Try adjusting your search criteria.';
+                  }
+                  if (user?.role === 'ADMIN') {
+                    return 'Get started by creating a new course.';
+                  }
+                  return 'No courses are currently available.';
+                })()}
               </p>
               {user?.role === 'ADMIN' && !searchQuery && (
                 <div className="mt-6">

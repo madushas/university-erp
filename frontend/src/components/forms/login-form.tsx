@@ -37,8 +37,8 @@ export default function LoginForm() {
       clearError()
       await login(data)
       router.push('/dashboard')
-    } catch (error) {
-      // Error is handled by the store
+    } catch {
+      
     } finally {
       setIsLoading(false)
     }
@@ -70,6 +70,13 @@ export default function LoginForm() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Development Helper */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-700 font-medium">Test Credentials:</p>
+              <p className="text-xs text-blue-600">Admin: admin / admin123</p>
+              <p className="text-xs text-blue-600">Student: john_doe / Password123!</p>
+            </div>
+            
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {error && (
                 <div className="rounded-md bg-red-50 p-4">

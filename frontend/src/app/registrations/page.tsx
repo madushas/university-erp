@@ -17,8 +17,11 @@ import {
   AcademicCapIcon
 } from '@heroicons/react/24/outline'
 
+import { useToast } from '@/components/ui/toast-provider'
+
 export default function RegistrationsPage() {
   const { user } = useAuthStore()
+  const { success, error: showError } = useToast()
   const { 
     registrations, 
     isLoading, 
@@ -26,6 +29,7 @@ export default function RegistrationsPage() {
     fetchRegistrations,
     fetchMyRegistrations,
     dropCourse,
+    deleteRegistration,
     updateGrade,
     clearError 
   } = useRegistrationStore()
@@ -41,12 +45,26 @@ export default function RegistrationsPage() {
     }
   }, [user, fetchRegistrations, fetchMyRegistrations])
 
-  const handleDropCourse = async (registrationId: number) => {
+  const handleDropCourse = async (courseId: number) => {
     if (window.confirm('Are you sure you want to drop this course?')) {
       try {
-        await dropCourse(registrationId)
+        await dropCourse(courseId)
+        success('Course dropped successfully')
       } catch (error) {
         console.error('Drop course failed:', error)
+        showError('Failed to drop course', 'Please try again or contact support')
+      }
+    }
+  }
+
+  const handleDeleteRegistration = async (registrationId: number) => {
+    if (window.confirm('Are you sure you want to remove this student from the course?')) {
+      try {
+        await deleteRegistration(registrationId)
+        success('Student removed from course successfully')
+      } catch (error) {
+        console.error('Delete registration failed:', error)
+        showError('Failed to remove student', 'Please try again or contact support')
       }
     }
   }
@@ -55,8 +73,10 @@ export default function RegistrationsPage() {
     try {
       await updateGrade(registrationId, { grade })
       setEditingGrade(null)
+      success('Grade updated successfully')
     } catch (error) {
       console.error('Update grade failed:', error)
+      showError('Failed to update grade', 'Please try again or contact support')
     }
   }
 
@@ -69,10 +89,10 @@ export default function RegistrationsPage() {
   }
 
   const filteredRegistrations = registrations.filter(registration =>
-    registration.course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    registration.course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     registration.course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (user?.role === 'ADMIN' && 
-     `${registration.student.firstName} ${registration.student.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()))
+     `${registration.user.firstName} ${registration.user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   const getStatusColor = (status: string) => {
@@ -150,12 +170,12 @@ export default function RegistrationsPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-lg">
-                        {registration.course.code} - {registration.course.name}
+                        {registration.course.code} - {registration.course.title}
                       </CardTitle>
                       <CardDescription>
                         {user?.role === 'ADMIN' && (
                           <span className="font-medium">
-                            Student: {registration.student.firstName} {registration.student.lastName}
+                            Student: {registration.user.firstName} {registration.user.lastName}
                           </span>
                         )}
                       </CardDescription>
@@ -239,7 +259,7 @@ export default function RegistrationsPage() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => handleDropCourse(registration.id)}
+                          onClick={() => handleDropCourse(registration.course.id)}
                           className="flex-1"
                         >
                           Drop Course
@@ -252,7 +272,7 @@ export default function RegistrationsPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDropCourse(registration.id)}
+                          onClick={() => handleDeleteRegistration(registration.id)}
                         >
                           Remove Student
                         </Button>

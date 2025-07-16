@@ -19,6 +19,7 @@ interface AuthActions {
   refreshAccessToken: () => Promise<void>
   clearError: () => void
   setLoading: (loading: boolean) => void
+  initialize: () => void
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -37,22 +38,23 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         try {
           set({ isLoading: true, error: null })
           
-          const response = await apiClient.post<AuthResponse>('/auth/login', credentials)
+          const response = await apiClient.post<AuthResponse>('/auth/login', { ...credentials })
           
-          // Store tokens in localStorage
-          localStorage.setItem('token', response.token)
+          // Store tokens in localStorage - Fix: use accessToken from backend response
+          localStorage.setItem('token', response.accessToken)
           localStorage.setItem('refreshToken', response.refreshToken)
           
           set({
             user: response.user,
-            token: response.token,
+            token: response.accessToken,  // Fix: was response.token
             refreshToken: response.refreshToken,
             isAuthenticated: true,
             isLoading: false,
             error: null,
           })
-        } catch (error: any) {
-          const errorMessage = error.response?.data?.message || 'Login failed'
+        } catch (error: unknown) {
+          const errorMessage = (error instanceof Error && error.message)
+            ? error.message : 'Login failed'
           set({
             error: errorMessage,
             isLoading: false,
@@ -66,22 +68,23 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         try {
           set({ isLoading: true, error: null })
           
-          const response = await apiClient.post<AuthResponse>('/auth/register', userData)
+          const response = await apiClient.post<AuthResponse>('/auth/register', { ...userData })
           
-          // Store tokens in localStorage
-          localStorage.setItem('token', response.token)
+          // Store tokens in localStorage - Fix: use accessToken from backend response
+          localStorage.setItem('token', response.accessToken)
           localStorage.setItem('refreshToken', response.refreshToken)
           
           set({
             user: response.user,
-            token: response.token,
+            token: response.accessToken,  // Fix: was response.token
             refreshToken: response.refreshToken,
             isAuthenticated: true,
             isLoading: false,
             error: null,
           })
-        } catch (error: any) {
-          const errorMessage = error.response?.data?.message || 'Registration failed'
+        } catch (error: unknown) {
+          const errorMessage = (error instanceof Error && error.message)
+            ? error.message : 'Registration failed'
           set({
             error: errorMessage,
             isLoading: false,
@@ -112,14 +115,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             throw new Error('No refresh token available')
           }
 
-          const response = await apiClient.post<{ token: string }>('/auth/refresh', {
+          const response = await apiClient.post<{ accessToken: string }>('/auth/refresh', {
             refreshToken,
           })
           
-          localStorage.setItem('token', response.token)
+          localStorage.setItem('token', response.accessToken)
           
           set({
-            token: response.token,
+            token: response.accessToken,
           })
         } catch (error) {
           // If refresh fails, logout user
@@ -131,6 +134,26 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       clearError: () => set({ error: null }),
       
       setLoading: (loading: boolean) => set({ isLoading: loading }),
+
+      initialize: () => {
+        // Check if we have stored tokens and restore authentication state
+        const storedToken = localStorage.getItem('token')
+        const storedRefreshToken = localStorage.getItem('refreshToken')
+        
+        if (storedToken && storedRefreshToken) {
+          // Check if the stored state is different from current state
+          const currentState = get()
+          if (!currentState.isAuthenticated || !currentState.token) {
+            // We have tokens but not authenticated, try to restore
+            // This will be validated by the API interceptor
+            set({
+              token: storedToken,
+              refreshToken: storedRefreshToken,
+              isAuthenticated: true,
+            })
+          }
+        }
+      },
     }),
     {
       name: 'auth-storage',

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useCourseStore } from '@/store/course-store'
+import { Course } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,25 +13,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 const courseSchema = z.object({
   code: z.string().min(1, 'Course code is required'),
-  name: z.string().min(1, 'Course name is required'),
+  title: z.string().min(1, 'Course title is required'),
   description: z.string().min(1, 'Course description is required'),
   credits: z.number().min(1, 'Credits must be at least 1').max(10, 'Credits cannot exceed 10'),
-  capacity: z.number().min(1, 'Capacity must be at least 1'),
+  maxStudents: z.number().min(1, 'Max students must be at least 1'),
   instructor: z.string().min(1, 'Instructor name is required'),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
+  schedule: z.string().min(1, 'Schedule is required'),
 })
 
 type CourseFormData = z.infer<typeof courseSchema>
 
 interface CourseFormProps {
+  course?: Course // For edit mode
   onSuccess?: () => void
   onCancel?: () => void
 }
 
-export default function CourseForm({ onSuccess, onCancel }: CourseFormProps) {
+export default function CourseForm({ course, onSuccess, onCancel }: Readonly<CourseFormProps>) {
   const [isLoading, setIsLoading] = useState(false)
-  const { createCourse, error, clearError } = useCourseStore()
+  const { createCourse, updateCourse, error, clearError } = useCourseStore()
+  const isEditing = Boolean(course)
 
   const {
     register,
@@ -39,17 +41,46 @@ export default function CourseForm({ onSuccess, onCancel }: CourseFormProps) {
     reset,
   } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
+    defaultValues: course ? {
+      code: course.code,
+      title: course.title,
+      description: course.description,
+      credits: course.credits,
+      maxStudents: course.maxStudents,
+      instructor: course.instructor,
+      schedule: course.schedule,
+    } : {},
   })
+
+  useEffect(() => {
+    if (course) {
+      reset({
+        code: course.code,
+        title: course.title,
+        description: course.description,
+        credits: course.credits,
+        maxStudents: course.maxStudents,
+        instructor: course.instructor,
+        schedule: course.schedule,
+      })
+    }
+  }, [course, reset])
 
   const onSubmit = async (data: CourseFormData) => {
     try {
       setIsLoading(true)
       clearError()
-      await createCourse(data)
+      
+      if (isEditing && course) {
+        await updateCourse(course.id, data)
+      } else {
+        await createCourse(data)
+      }
+      
       reset()
       onSuccess?.()
     } catch (error) {
-      // Error is handled by the store
+      console.error('Error submitting course:', error);
     } finally {
       setIsLoading(false)
     }
@@ -58,9 +89,9 @@ export default function CourseForm({ onSuccess, onCancel }: CourseFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create New Course</CardTitle>
+        <CardTitle>{isEditing ? 'Edit Course' : 'Create New Course'}</CardTitle>
         <CardDescription>
-          Add a new course to the system
+          {isEditing ? 'Update course information' : 'Add a new course to the system'}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -111,19 +142,19 @@ export default function CourseForm({ onSuccess, onCancel }: CourseFormProps) {
           </div>
 
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Course Name
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+              Course Title
             </label>
             <div className="mt-1">
               <Input
-                id="name"
+                id="title"
                 type="text"
                 placeholder="e.g., Introduction to Computer Science"
-                {...register('name')}
-                className={errors.name ? 'border-red-300' : ''}
+                {...register('title')}
+                className={errors.title ? 'border-red-300' : ''}
               />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+              {errors.title && (
+                <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
               )}
             </div>
           </div>
@@ -146,22 +177,40 @@ export default function CourseForm({ onSuccess, onCancel }: CourseFormProps) {
             </div>
           </div>
 
+          <div>
+            <label htmlFor="schedule" className="block text-sm font-medium text-gray-700">
+              Schedule
+            </label>
+            <div className="mt-1">
+              <Input
+                id="schedule"
+                type="text"
+                placeholder="e.g., Mon/Wed/Fri 9:00-10:30"
+                {...register('schedule')}
+                className={errors.schedule ? 'border-red-300' : ''}
+              />
+              {errors.schedule && (
+                <p className="mt-1 text-sm text-red-600">{errors.schedule.message}</p>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="capacity" className="block text-sm font-medium text-gray-700">
-                Capacity
+              <label htmlFor="maxStudents" className="block text-sm font-medium text-gray-700">
+                Max Students
               </label>
               <div className="mt-1">
                 <Input
-                  id="capacity"
+                  id="maxStudents"
                   type="number"
                   min="1"
                   placeholder="e.g., 30"
-                  {...register('capacity', { valueAsNumber: true })}
-                  className={errors.capacity ? 'border-red-300' : ''}
+                  {...register('maxStudents', { valueAsNumber: true })}
+                  className={errors.maxStudents ? 'border-red-300' : ''}
                 />
-                {errors.capacity && (
-                  <p className="mt-1 text-sm text-red-600">{errors.capacity.message}</p>
+                {errors.maxStudents && (
+                  <p className="mt-1 text-sm text-red-600">{errors.maxStudents.message}</p>
                 )}
               </div>
             </div>
@@ -185,49 +234,18 @@ export default function CourseForm({ onSuccess, onCancel }: CourseFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
-                Start Date
-              </label>
-              <div className="mt-1">
-                <Input
-                  id="startDate"
-                  type="date"
-                  {...register('startDate')}
-                  className={errors.startDate ? 'border-red-300' : ''}
-                />
-                {errors.startDate && (
-                  <p className="mt-1 text-sm text-red-600">{errors.startDate.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
-                End Date
-              </label>
-              <div className="mt-1">
-                <Input
-                  id="endDate"
-                  type="date"
-                  {...register('endDate')}
-                  className={errors.endDate ? 'border-red-300' : ''}
-                />
-                {errors.endDate && (
-                  <p className="mt-1 text-sm text-red-600">{errors.endDate.message}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
           <div className="flex gap-3">
             <Button
               type="submit"
               className="flex-1"
               disabled={isLoading}
             >
-              {isLoading ? 'Creating...' : 'Create Course'}
+              {(() => {
+                if (isLoading) {
+                  return isEditing ? 'Updating...' : 'Creating...';
+                }
+                return isEditing ? 'Update Course' : 'Create Course';
+              })()}
             </Button>
             {onCancel && (
               <Button

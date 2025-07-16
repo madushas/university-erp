@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { Registration, RegistrationCreateRequest, GradeUpdateRequest, PaginatedResponse } from '@/types'
-import apiClient from '@/lib/api-client'
+import { Registration, GradeUpdateRequest } from '@/types'
+import { optimizedApiService } from '@/services/optimized-api-service'
 
 interface RegistrationState {
   registrations: Registration[]
@@ -16,8 +16,10 @@ interface RegistrationActions {
   fetchMyRegistrations: (page?: number, size?: number) => Promise<void>
   fetchRegistrationById: (id: number) => Promise<void>
   enrollInCourse: (courseId: number) => Promise<Registration>
-  dropCourse: (registrationId: number) => Promise<void>
+  dropCourse: (courseId: number) => Promise<void>
+  deleteRegistration: (registrationId: number) => Promise<void>
   updateGrade: (registrationId: number, gradeData: GradeUpdateRequest) => Promise<Registration>
+  isEnrolledInCourse: (courseId: number) => boolean
   clearError: () => void
   setLoading: (loading: boolean) => void
 }
@@ -32,23 +34,22 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
   error: null,
 
   // Actions
-  fetchRegistrations: async (page = 0, size = 10) => {
+  fetchRegistrations: async () => {
     try {
       set({ isLoading: true, error: null })
       
-      const response = await apiClient.get<PaginatedResponse<Registration>>('/registrations', {
-        page,
-        size,
-      })
+      // For admin, get all registrations - using status filter for paginated results
+      const registrations = await optimizedApiService.getRegistrationsByStatus('ENROLLED')
       
       set({
-        registrations: response.content,
-        totalPages: response.totalPages,
-        currentPage: response.number,
+        registrations: registrations,
+        totalPages: 1,
+        currentPage: 0,
         isLoading: false,
       })
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to fetch registrations'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message) 
+        ? error.message : 'Failed to fetch registrations'
       set({
         error: errorMessage,
         isLoading: false,
@@ -56,26 +57,26 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     }
   },
 
-  fetchMyRegistrations: async (page = 0, size = 10) => {
+  fetchMyRegistrations: async () => {
     try {
       set({ isLoading: true, error: null })
       
-      const response = await apiClient.get<PaginatedResponse<Registration>>('/registrations/my', {
-        page,
-        size,
-      })
+      const registrations = await optimizedApiService.getMyRegistrations()
       
       set({
-        registrations: response.content,
-        totalPages: response.totalPages,
-        currentPage: response.number,
-        isLoading: false,
+      registrations: registrations,
+      totalPages: 1,
+      currentPage: 0,
+      isLoading: false,
       })
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to fetch my registrations'
+    } catch (error: unknown) {
+      const errorMessage = 
+      (error instanceof Error && error.message) 
+        ? error.message 
+        : 'Failed to fetch my registrations'
       set({
-        error: errorMessage,
-        isLoading: false,
+      error: errorMessage,
+      isLoading: false,
       })
     }
   },
@@ -84,14 +85,15 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      const registration = await apiClient.get<Registration>(`/registrations/${id}`)
+      const registration = await optimizedApiService.getRegistrationById(id)
       
       set({
         currentRegistration: registration,
         isLoading: false,
       })
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to fetch registration'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message) 
+        ? error.message : 'Failed to fetch registration'
       set({
         error: errorMessage,
         isLoading: false,
@@ -103,7 +105,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      const registration = await apiClient.post<Registration>('/registrations', { courseId })
+      const registration = await optimizedApiService.enrollInCourse(courseId)
       
       // Add new registration to the list
       set((state) => ({
@@ -112,8 +114,9 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
       }))
       
       return registration
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to enroll in course'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message)
+        ? error.message : 'Failed to enroll in course'
       set({
         error: errorMessage,
         isLoading: false,
@@ -122,11 +125,34 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     }
   },
 
-  dropCourse: async (registrationId: number) => {
+  dropCourse: async (courseId: number) => {
     try {
       set({ isLoading: true, error: null })
       
-      await apiClient.delete(`/registrations/${registrationId}`)
+      await optimizedApiService.dropCourse(courseId)
+      
+      // Remove registration from the list based on courseId
+      set((state) => ({
+        registrations: state.registrations.filter((reg) => reg.course.id !== courseId),
+        currentRegistration: state.currentRegistration?.course.id === courseId ? null : state.currentRegistration,
+        isLoading: false,
+      }))
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message) 
+        ? error.message : 'Failed to drop course'
+      set({
+        error: errorMessage,
+        isLoading: false,
+      })
+      throw new Error(errorMessage)
+    }
+  },
+
+  deleteRegistration: async (registrationId: number) => {
+    try {
+      set({ isLoading: true, error: null })
+      
+      await optimizedApiService.deleteRegistration(registrationId)
       
       // Remove registration from the list
       set((state) => ({
@@ -134,8 +160,9 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
         currentRegistration: state.currentRegistration?.id === registrationId ? null : state.currentRegistration,
         isLoading: false,
       }))
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to drop course'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message) 
+        ? error.message : 'Failed to delete registration'
       set({
         error: errorMessage,
         isLoading: false,
@@ -148,25 +175,21 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      const updatedRegistration = await apiClient.put<Registration>(
-        `/registrations/${registrationId}/grade`,
-        gradeData
-      )
+      const updatedRegistration = await optimizedApiService.updateGrade(registrationId, gradeData.grade)
       
-      // Update registration in the list
+      // Update the registration in the list
       set((state) => ({
         registrations: state.registrations.map((reg) =>
           reg.id === registrationId ? updatedRegistration : reg
         ),
-        currentRegistration: state.currentRegistration?.id === registrationId 
-          ? updatedRegistration 
-          : state.currentRegistration,
+        currentRegistration: state.currentRegistration?.id === registrationId ? updatedRegistration : state.currentRegistration,
         isLoading: false,
       }))
       
       return updatedRegistration
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to update grade'
+    } catch (error: unknown) {
+      const errorMessage = (error instanceof Error && error.message) 
+        ? error.message : 'Failed to update grade'
       set({
         error: errorMessage,
         isLoading: false,
@@ -176,6 +199,11 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
   },
 
   clearError: () => set({ error: null }),
+  
+  isEnrolledInCourse: (courseId: number) => {
+    const { registrations } = get()
+    return registrations.some(reg => reg.course.id === courseId && reg.status === 'ENROLLED')
+  },
   
   setLoading: (loading: boolean) => set({ isLoading: loading }),
 }))
