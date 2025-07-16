@@ -4,6 +4,7 @@ import com.university.backend.dto.request.CourseRequest;
 import com.university.backend.dto.response.CourseResponse;
 import com.university.backend.entity.Course;
 import com.university.backend.exception.CourseNotFoundException;
+import com.university.backend.exception.CourseAlreadyExistsException;
 import com.university.backend.repository.CourseRepository;
 import com.university.backend.repository.RegistrationRepository;
 import lombok.RequiredArgsConstructor;
@@ -88,7 +89,7 @@ public class CourseService {
         log.info("Creating new course with code: {}", request.getCode());
         
         if (courseRepository.existsByCode(request.getCode())) {
-            throw new RuntimeException("Course with code '" + request.getCode() + "' already exists");
+            throw new CourseAlreadyExistsException("Course with code '" + request.getCode() + "' already exists");
         }
 
         Course course = Course.builder()
@@ -116,7 +117,7 @@ public class CourseService {
         // Check if code is being changed and if new code already exists
         if (!course.getCode().equals(request.getCode()) && 
             courseRepository.existsByCode(request.getCode())) {
-            throw new RuntimeException("Course with code '" + request.getCode() + "' already exists");
+            throw new CourseAlreadyExistsException("Course with code '" + request.getCode() + "' already exists");
         }
 
         course.setCode(request.getCode());

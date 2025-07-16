@@ -3,9 +3,9 @@ spring:
     name: university-course-management
   
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/postgres}
-    username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:12345}
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -16,13 +16,8 @@ spring:
   
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: ${SHOW_SQL:true}
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-        use_sql_comments: true
+      ddl-auto: update
+    show-sql: ${SHOW_SQL}
   
   flyway:
     enabled: false
@@ -43,18 +38,18 @@ management:
 
 logging:
   level:
-    com.university.backend: ${LOG_LEVEL:INFO}
-    org.springframework.security: DEBUG
+    '[com.university.backend]': ${LOG_LEVEL}
+    '[org.springframework.security]': DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
 app:
   jwt:
-    secret: ${JWT_SECRET:aVeryLongAndComplexSecretKeyForJWT_HS512SigningThatIsAtLeast64CharactersLongAndRandomlyGenerated1234567890ABCDEF}
+    secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:86400000} # 24 hours
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 # API Documentation
 springdoc:

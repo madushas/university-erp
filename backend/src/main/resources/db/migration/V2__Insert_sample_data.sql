@@ -1,12 +1,12 @@
 -- Insert admin user (password: 'password' encoded with BCrypt)
 INSERT INTO users (username, email, password, first_name, last_name, role)
-VALUES ('admin', 'admin@university.com', '$2a$08$UdxACAC38Oz3geurL2eDjO40..Jwh.cFncSrQhrANe81T3/lwMxXe', 'Admin', 'User', 'ADMIN');
+VALUES ('admin', 'admin@university.com', '$2a$10$aj4fc8CeHHCJOveX1HQpH.uFvvQ58kDD6kYsCk1wmYQwRfyFbbLLS', 'Admin', 'User', 'ADMIN');
 
 -- Insert sample students
 INSERT INTO users (username, email, password, first_name, last_name, role)
 VALUES 
-    ('john_doe', 'john@university.com', '$2a$08$UdxACAC38Oz3geurL2eDjO40..Jwh.cFncSrQhrANe81T3/lwMxXe', 'John', 'Doe', 'STUDENT'),
-    ('jane_smith', 'jane@university.com', '$2a$08$UdxACAC38Oz3geurL2eDjO40..Jwh.cFncSrQhrANe81T3/lwMxXe', 'Jane', 'Smith', 'STUDENT');
+    ('john_doe', 'john@university.com', '$2a$10$aj4fc8CeHHCJOveX1HQpH.uFvvQ58kDD6kYsCk1wmYQwRfyFbbLLS', 'John', 'Doe', 'STUDENT'),
+    ('jane_smith', 'jane@university.com', '$2a$10$aj4fc8CeHHCJOveX1HQpH.uFvvQ58kDD6kYsCk1wmYQwRfyFbbLLS', 'Jane', 'Smith', 'STUDENT');
 
 -- Insert sample courses
 INSERT INTO courses (code, title, description, instructor, schedule, credits, max_students)

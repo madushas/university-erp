@@ -43,10 +43,8 @@ public class RegistrationController {
     public ResponseEntity<List<RegistrationResponse>> getMyRegistrations() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        // For now, we'll need to get user ID through a service method
-        // This will be implemented when we add UserService
-        // List<RegistrationResponse> registrations = registrationService.getUserRegistrationsByUsername(username);
-        return ResponseEntity.ok(List.of()); // Temporary placeholder
+        List<RegistrationResponse> registrations = registrationService.getUserRegistrationsByUsername(username);
+        return ResponseEntity.ok(registrations);
     }
 
     @Operation(summary = "Get course registrations", description = "Get all registrations for a specific course (admin only)")
@@ -79,9 +77,8 @@ public class RegistrationController {
         @Parameter(description = "Course ID") @PathVariable Long courseId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        // For now, we'll need to get user ID through a service method
-        // RegistrationResponse registration = registrationService.enrollUserInCourseByUsername(username, courseId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(null); // Temporary placeholder
+        RegistrationResponse registration = registrationService.enrollUserInCourseByUsername(username, courseId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(registration);
     }
 
     @Operation(summary = "Admin enroll user", description = "Enroll a specific user in a course (admin only)")
@@ -121,8 +118,7 @@ public class RegistrationController {
         @Parameter(description = "Course ID") @PathVariable Long courseId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        // For now, we'll need to get user ID through a service method
-        // registrationService.dropCourseByUsername(username, courseId);
+        registrationService.dropCourseByUsername(username, courseId);
         return ResponseEntity.noContent().build();
     }
 

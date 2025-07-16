@@ -39,6 +39,17 @@ public class RegistrationService {
     }
 
     @Transactional(readOnly = true)
+    public List<RegistrationResponse> getUserRegistrationsByUsername(String username) {
+        log.info("Fetching registrations for user: {}", username);
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+        return registrationRepository.findByUserIdWithDetails(user.getId())
+            .stream()
+            .map(this::mapToRegistrationResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<RegistrationResponse> getCourseRegistrations(Long courseId) {
         log.info("Fetching registrations for course: {}", courseId);
         return registrationRepository.findByCourseIdWithDetails(courseId)
@@ -58,20 +69,16 @@ public class RegistrationService {
     public RegistrationResponse enrollUserInCourse(Long userId, Long courseId) {
         log.info("Enrolling user {} in course {}", userId, courseId);
 
-        // Check if user exists
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
-        // Check if course exists
         Course course = courseRepository.findById(courseId)
             .orElseThrow(() -> new CourseNotFoundException("Course not found with id: " + courseId));
 
-        // Check if user is already enrolled
         if (registrationRepository.existsByUserIdAndCourseId(userId, courseId)) {
             throw new DuplicateRegistrationException("User is already enrolled in this course");
         }
 
-        // Check if course is full
         Long enrolledCount = registrationRepository.countEnrolledStudentsByCourseId(courseId);
         if (enrolledCount >= course.getMaxStudents()) {
             throw new CourseFullException("Course is full. Maximum students: " + course.getMaxStudents());
@@ -85,6 +92,36 @@ public class RegistrationService {
 
         Registration savedRegistration = registrationRepository.save(registration);
         log.info("User {} successfully enrolled in course {}", userId, courseId);
+
+        return mapToRegistrationResponse(savedRegistration);
+    }
+
+    public RegistrationResponse enrollUserInCourseByUsername(String username, Long courseId) {
+        log.info("Enrolling user {} in course {}", username, courseId);
+
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new CourseNotFoundException("Course not found with id: " + courseId));
+
+        if (registrationRepository.existsByUserIdAndCourseId(user.getId(), courseId)) {
+            throw new DuplicateRegistrationException("User is already enrolled in this course");
+        }
+
+        Long enrolledCount = registrationRepository.countEnrolledStudentsByCourseId(courseId);
+        if (enrolledCount >= course.getMaxStudents()) {
+            throw new CourseFullException("Course is full. Maximum students: " + course.getMaxStudents());
+        }
+
+        Registration registration = Registration.builder()
+            .user(user)
+            .course(course)
+            .status(RegistrationStatus.ENROLLED)
+            .build();
+
+        Registration savedRegistration = registrationRepository.save(registration);
+        log.info("User {} successfully enrolled in course {}", username, courseId);
 
         return mapToRegistrationResponse(savedRegistration);
     }
@@ -131,6 +168,21 @@ public class RegistrationService {
         log.info("Course {} dropped successfully for user {}", courseId, userId);
     }
 
+    public void dropCourseByUsername(String username, Long courseId) {
+        log.info("Dropping course {} for user {}", courseId, username);
+
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+
+        Registration registration = registrationRepository.findByUserIdAndCourseId(user.getId(), courseId)
+            .orElseThrow(() -> new RegistrationNotFoundException(
+                "Registration not found for user " + username + " and course " + courseId));
+
+        registration.setStatus(RegistrationStatus.DROPPED);
+        registrationRepository.save(registration);
+        log.info("Course {} dropped successfully for user {}", courseId, username);
+    }
+
     public void deleteRegistration(Long registrationId) {
         log.info("Deleting registration: {}", registrationId);
 
@@ -143,7 +195,7 @@ public class RegistrationService {
 
     @Transactional(readOnly = true)
     public List<RegistrationResponse> getRegistrationsByStatus(RegistrationStatus status) {
-        log.info("Fetching registrations by status: {}", status);
+        log.info("Fetching registrations with status: {}", status);
         return registrationRepository.findByStatus(status)
             .stream()
             .map(this::mapToRegistrationResponse)
