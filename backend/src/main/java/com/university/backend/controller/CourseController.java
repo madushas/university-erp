@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/courses")
+@RequestMapping("/api/courses")
 @RequiredArgsConstructor
 @Tag(name = "Course Management", description = "Course management APIs")
 @SecurityRequirement(name = "bearerAuth")

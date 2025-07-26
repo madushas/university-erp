@@ -1,22 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { ToastProvider } from "@/components/ui/toast-provider";
-import ErrorBoundary from "@/components/error-boundary";
+import Providers from "@/components/providers";
+import LayoutWrapper from "@/components/layout/layout-wrapper";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
-  title: "ERP System",
-  description: "Enterprise Resource Planning System",
+  title: "University ERP System",
+  description: "University Enterprise Resource Planning System",
 };
 
 export default function RootLayout({
@@ -26,14 +21,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable}`}
-      >
-        <ErrorBoundary>
-          <ToastProvider>
+      <body className={`${inter.variable} font-sans antialiased bg-gray-50 min-h-screen`}>
+        <Providers>
+          <LayoutWrapper>
             {children}
-          </ToastProvider>
-        </ErrorBoundary>
+          </LayoutWrapper>
+        </Providers>
       </body>
     </html>
   );

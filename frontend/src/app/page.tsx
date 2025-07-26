@@ -1,40 +1,41 @@
 'use client'
 
+import { useSession } from 'next-auth/react'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth-store'
-import Navigation from '@/components/navigation'
-import { DashboardPage } from '@/components/dashboard/dashboard-page'
 
 export default function HomePage() {
-  const { isAuthenticated, initialize } = useAuthStore()
+  const { status } = useSession()
   const router = useRouter()
 
   useEffect(() => {
-    // Initialize auth state from localStorage
-    initialize()
-  }, [initialize])
-
-  useEffect(() => {
-    if (!isAuthenticated) {
+    if (status === 'loading') return // Still loading
+    
+    if (status === 'authenticated') {
+      router.push('/dashboard')
+    } else {
       router.push('/login')
     }
-  }, [isAuthenticated, router])
+  }, [status, router])
 
-  if (!isAuthenticated) {
+  // Show loading while redirecting
+  if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <Navigation>
-      <DashboardPage />
-    </Navigation>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Redirecting...</p>
+      </div>
+    </div>
   )
 }

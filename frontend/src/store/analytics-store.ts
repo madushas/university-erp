@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { analyticsApi } from '@/lib/api-service'
+import { analyticsApi } from '@/services/api-service'
 import { 
   CourseAnalytics
 } from '@/types'

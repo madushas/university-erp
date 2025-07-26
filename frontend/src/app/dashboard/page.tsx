@@ -1,284 +1,230 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useAuthStore } from '@/store/auth-store'
-import { useCourseStore } from '@/store/course-store'
-import { useRegistrationStore } from '@/store/registration-store'
-import { useAnalyticsStore } from '@/store/analytics-store'
-import ProtectedRoute from '@/components/protected-route'
-import Navigation from '@/components/navigation'
-import { ApiErrorHandler, LoadingSpinner } from '@/components/error-boundary'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatDate } from '@/lib/utils'
 import { 
   BookOpenIcon, 
   ClipboardDocumentListIcon,
-  AcademicCapIcon 
+  AcademicCapIcon,
+  ChartBarIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
-import { RegistrationStatus } from '@/types'
+import { courseApi, registrationApi, analyticsApi } from '@/services/api-service'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
+
+interface DashboardStats {
+  totalCourses: number
+  myRegistrations: number
+  completedCourses: number
+  totalRegistrations?: number
+  totalUsers?: number
+}
 
 export default function DashboardPage() {
-  const { user, initialize } = useAuthStore()
-  const { courses, fetchCourses, isLoading: coursesLoading, error: coursesError } = useCourseStore()
-  const { registrations, fetchMyRegistrations, isLoading: registrationsLoading, error: registrationsError } = useRegistrationStore()
-  const { dashboardAnalytics, fetchDashboardAnalytics, isLoading: analyticsLoading, error: analyticsError } = useAnalyticsStore()
-  
-  const [stats, setStats] = useState({
+  const { data: session } = useSession()
+  const [stats, setStats] = useState<DashboardStats>({
     totalCourses: 0,
     myRegistrations: 0,
     completedCourses: 0,
-    totalRegistrations: 0,
-    activeRegistrations: 0,
   })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const [refreshKey, setRefreshKey] = useState(0)
+  useEffect(() => {
+    if (session?.user) {
+      fetchDashboardData()
+    }
+  }, [session])
 
-  const loadData = useCallback(async () => {
+  const fetchDashboardData = async () => {
     try {
-      // Fetch courses data
-      await fetchCourses(0, 100)
-      
-      // Fetch user-specific data
-      if (user?.role === 'STUDENT') {
-        await fetchMyRegistrations(0, 100)
+      setLoading(true)
+      setError(null)
+
+      // Fetch common data
+      const [coursesData, registrationsData] = await Promise.all([
+        courseApi.getAllCourses(),
+        registrationApi.getMyRegistrations()
+      ])
+
+      // Calculate stats
+      const newStats: DashboardStats = {
+        totalCourses: coursesData.length,
+        myRegistrations: registrationsData.length,
+        completedCourses: registrationsData.filter(r => r.status === 'COMPLETED').length,
       }
-      
-      // Fetch analytics data (for admin users)
-      if (user?.role === 'ADMIN') {
-        await fetchDashboardAnalytics()
+
+      // If admin, fetch additional data
+      if (session?.user?.role === 'ADMIN') {
+        try {
+          const analyticsData = await analyticsApi.getDashboardAnalytics()
+          newStats.totalRegistrations = analyticsData.totalRegistrations
+          newStats.totalUsers = analyticsData.totalStudents
+        } catch (err) {
+          console.error('Failed to fetch admin analytics:', err)
+        }
       }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error)
+
+      setStats(newStats)
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err)
+      setError('Failed to load dashboard data')
+    } finally {
+      setLoading(false)
     }
-  }, [fetchCourses, fetchMyRegistrations, fetchDashboardAnalytics, user])
-
-  useEffect(() => {
-    // Initialize auth state from localStorage
-    initialize()
-  }, [initialize])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData, user, refreshKey])
-
-  useEffect(() => {
-    // Update stats based on analytics data or local data
-    if (user?.role === 'ADMIN' && dashboardAnalytics) {
-      setStats({
-        totalCourses: dashboardAnalytics.totalCourses,
-        myRegistrations: dashboardAnalytics.totalRegistrations,
-        completedCourses: dashboardAnalytics.completedCourses,
-        totalRegistrations: dashboardAnalytics.totalRegistrations,
-        activeRegistrations: dashboardAnalytics.activeRegistrations,
-      })
-    } else {
-      // For students, use local data
-      const completedCount = registrations.filter(reg => reg.status === 'COMPLETED').length
-      const activeCount = registrations.filter(reg => reg.status === 'ENROLLED').length
-      
-      setStats({
-        totalCourses: courses.length,
-        myRegistrations: registrations.length,
-        completedCourses: completedCount,
-        totalRegistrations: registrations.length,
-        activeRegistrations: activeCount,
-      })
-    }
-  }, [courses, registrations, dashboardAnalytics, user])
-
-  const recentRegistrations = registrations.slice(0, 5)
-  const recentCourses = courses.slice(0, 5)
-
-  // Handle refresh
-  const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1)
   }
 
-  const isLoading = coursesLoading || registrationsLoading || analyticsLoading
-  const hasError = coursesError || registrationsError || analyticsError
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner />
+      </div>
+    )
+  }
 
-  return (
-    <ProtectedRoute>
-      <Navigation>
-        <div className="space-y-6">
-          {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-2 text-gray-600">
-              Welcome back, {user?.firstName}! Here&apos;s what&apos;s happening with your courses.
-            </p>
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
           </div>
-
-          {/* Error Handling */}
-          {hasError && (
-            <ApiErrorHandler 
-              error={coursesError || registrationsError || analyticsError}
-              onRetry={handleRefresh}
-              onClear={() => {
-                // Clear errors (you might want to add clearError methods to stores)
-              }}
-            />
-          )}
-
-          {/* Loading State */}
-          {isLoading && <LoadingSpinner message="Loading dashboard data..." />}
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <BookOpenIcon className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Total Courses</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <ClipboardDocumentListIcon className="h-8 w-8 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">
-                      {user?.role === 'ADMIN' ? 'Total Registrations' : 'My Registrations'}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.myRegistrations}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <AcademicCapIcon className="h-8 w-8 text-purple-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Completed Courses</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.completedCourses}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <ClipboardDocumentListIcon className="h-8 w-8 text-orange-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Active Enrollments</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.activeRegistrations}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Courses */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Courses</CardTitle>
-                <CardDescription>
-                  Latest courses added to the system
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentCourses.map((course) => (
-                    <div key={course.id} className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-blue-600 rounded-full" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {course.code} - {course.title}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Instructor: {course.instructor}
-                        </p>
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {course.credits} credits
-                      </div>
-                    </div>
-                  ))}
-                  {courses.length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-4">
-                      No courses available
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Registrations */}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {user?.role === 'ADMIN' ? 'Recent Registrations' : 'My Recent Activity'}
-                </CardTitle>
-                <CardDescription>
-                  Latest enrollment activity
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentRegistrations.map((registration) => {
-                    const statusColorMap: Record<RegistrationStatus, string> = {
-                      ENROLLED: 'bg-green-600',
-                      COMPLETED: 'bg-blue-600',
-                      DROPPED: 'bg-red-600',
-                    };
-                    const statusBadgeColorMap: Record<RegistrationStatus, string> = {
-                      ENROLLED: 'bg-green-100 text-green-800',
-                      COMPLETED: 'bg-blue-100 text-blue-800',
-                      DROPPED: 'bg-red-100 text-red-800',
-                    };
-
-                    const statusColor = statusColorMap[registration.status] || 'bg-gray-400';
-                    const statusBadgeColor = statusBadgeColorMap[registration.status] || 'bg-gray-100 text-gray-800';
-
-                    return (
-                      <div key={registration.id} className="flex items-center space-x-4">
-                        <div className={`w-2 h-2 rounded-full ${statusColor}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {registration.course.code} - {registration.course.title}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {user?.role === 'ADMIN' ? `Student: ${registration.user.firstName} ${registration.user.lastName}` : 
-                             `Registered: ${formatDate(registration.registrationDate)}`}
-                          </p>
-                        </div>
-                        <div className="text-sm">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadgeColor}`}>
-                            {registration.status}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  {registrations.length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-4">
-                      No registrations yet
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">Error</h3>
+            <div className="mt-2 text-sm text-red-700">{error}</div>
           </div>
         </div>
-      </Navigation>
-    </ProtectedRoute>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-600">Welcome back, {session?.user?.name}</p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Courses</CardTitle>
+            <BookOpenIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalCourses}</div>
+            <p className="text-xs text-muted-foreground">Available in system</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">My Registrations</CardTitle>
+            <ClipboardDocumentListIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.myRegistrations}</div>
+            <p className="text-xs text-muted-foreground">Enrolled courses</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <AcademicCapIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.completedCourses}</div>
+            <p className="text-xs text-muted-foreground">Finished courses</p>
+          </CardContent>
+        </Card>
+
+        {session?.user?.role === 'ADMIN' && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <UserGroupIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalUsers || 0}</div>
+              <p className="text-xs text-muted-foreground">Registered users</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Common tasks you can perform</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <a 
+              href="/courses" 
+              className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <BookOpenIcon className="h-5 w-5 text-blue-600 mr-3" />
+              <div>
+                <p className="font-medium">Browse Courses</p>
+                <p className="text-sm text-gray-600">View and enroll in available courses</p>
+              </div>
+            </a>
+            <a 
+              href="/registrations" 
+              className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <ClipboardDocumentListIcon className="h-5 w-5 text-green-600 mr-3" />
+              <div>
+                <p className="font-medium">My Registrations</p>
+                <p className="text-sm text-gray-600">View your enrolled courses</p>
+              </div>
+            </a>
+            {session?.user?.role === 'ADMIN' && (
+              <a 
+                href="/analytics" 
+                className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <ChartBarIcon className="h-5 w-5 text-purple-600 mr-3" />
+                <div>
+                  <p className="font-medium">Analytics</p>
+                  <p className="text-sm text-gray-600">View system analytics</p>
+                </div>
+              </a>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Your recent actions in the system</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Dashboard accessed</p>
+                  <p className="text-xs text-gray-600">Just now</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Logged in successfully</p>
+                  <p className="text-xs text-gray-600">Today</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }

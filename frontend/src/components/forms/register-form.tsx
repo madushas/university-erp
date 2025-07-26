@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth-store'
+import { authApi } from '@/services/api-service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,8 +27,8 @@ type RegisterFormData = z.infer<typeof registerSchema>
 
 export default function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false)
+  const [apiError, setApiError] = useState('')
   const router = useRouter()
-  const { register: registerUser, error, clearError } = useAuthStore()
 
   const {
     register,
@@ -41,11 +41,25 @@ export default function RegisterForm() {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       setIsLoading(true)
-      clearError()
-      const { ...userData } = data
-      await registerUser(userData)
-      router.push('/dashboard')
-    } catch {
+      setApiError('')
+      
+      const { confirmPassword, ...userData } = data
+      const response = await authApi.register(userData)
+      
+      if (response.accessToken) {
+        // Registration successful, redirect to dashboard
+        router.push('/dashboard')
+      }
+    } catch (error: any) {
+      console.error('Registration failed:', error)
+      
+      if (error.status === 409) {
+        setApiError('Username or email already exists')
+      } else if (error.status === 400) {
+        setApiError('Invalid registration data. Please check your inputs.')
+      } else {
+        setApiError('Registration failed. Please try again.')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -78,9 +92,18 @@ export default function RegisterForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              {error && (
+              {(apiError || Object.keys(errors).length > 0) && (
                 <div className="rounded-md bg-red-50 p-4">
-                  <div className="text-sm text-red-700">{error}</div>
+                  <div className="text-sm text-red-700">
+                    {apiError && <p className="mb-2">{apiError}</p>}
+                    {Object.keys(errors).length > 0 && (
+                      <ul className="space-y-1">
+                        {Object.entries(errors).map(([key, error]) => (
+                          <li key={key}>{error.message}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               )}
 

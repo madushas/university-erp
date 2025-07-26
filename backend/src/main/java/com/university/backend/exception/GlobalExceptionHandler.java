@@ -7,15 +7,15 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestControllerAdvice
+@ControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
 
@@ -29,6 +29,18 @@ public class GlobalExceptionHandler {
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex, WebRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Not Found")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(CourseNotFoundException.class)
@@ -148,5 +160,29 @@ public class GlobalExceptionHandler {
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(DepartmentAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleDepartmentAlreadyExists(DepartmentAlreadyExistsException ex, WebRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error("Conflict")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(DepartmentNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleDepartmentNotFound(DepartmentNotFoundException ex, WebRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Not Found")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 }

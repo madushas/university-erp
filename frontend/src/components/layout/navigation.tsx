@@ -1,252 +1,114 @@
 'use client'
 
-import { useState } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth-store'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import {
-  BarChart3,
-  BookOpen,
-  Calendar,
-  GraduationCap,
-  Home,
-  Menu,
-  Settings,
-  Users,
-  X,
-  Bell,
-  Search,
-  ChevronDown,
-  LogOut,
-  User
-} from 'lucide-react'
-import type { ComponentType, SVGProps } from 'react'
+import { 
+  HomeIcon, 
+  UserGroupIcon, 
+  AcademicCapIcon, 
+  DocumentTextIcon, 
+  ChartBarIcon, 
+  CogIcon,
+  ArrowRightCircleIcon 
+} from '@heroicons/react/24/outline'
 
-interface NavigationProps {
-  userRole?: 'ADMIN' | 'STUDENT' | 'INSTRUCTOR'
-  userName?: string
-}
-
-interface NavigationItem {
-  href: string
+interface NavItem {
   label: string
-  icon: ComponentType<SVGProps<SVGSVGElement>>
-  badge?: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  adminOnly?: boolean
 }
 
-const navigationItems: Record<string, NavigationItem[]> = {
-  ADMIN: [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: Home },
-    { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, badge: 'New' },
-    { href: '/admin/students', label: 'Students', icon: Users },
-    { href: '/admin/courses', label: 'Courses', icon: BookOpen },
-    { href: '/admin/departments', label: 'Departments', icon: GraduationCap },
-    { href: '/admin/schedule', label: 'Schedule', icon: Calendar },
-    { href: '/admin/settings', label: 'Settings', icon: Settings }
-  ],
-  STUDENT: [
-    { href: '/student/dashboard', label: 'Dashboard', icon: Home },
-    { href: '/student/courses', label: 'My Courses', icon: BookOpen },
-    { href: '/student/schedule', label: 'Schedule', icon: Calendar },
-    { href: '/student/grades', label: 'Grades', icon: BarChart3 },
-    { href: '/student/profile', label: 'Profile', icon: User }
-  ],
-  INSTRUCTOR: [
-    { href: '/instructor/dashboard', label: 'Dashboard', icon: Home },
-    { href: '/instructor/courses', label: 'My Courses', icon: BookOpen },
-    { href: '/instructor/students', label: 'Students', icon: Users },
-    { href: '/instructor/analytics', label: 'Analytics', icon: BarChart3 },
-    { href: '/instructor/schedule', label: 'Schedule', icon: Calendar }
-  ]
-}
+const navItems: NavItem[] = [
+  { label: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { label: 'Courses', href: '/courses', icon: AcademicCapIcon },
+  { label: 'Registrations', href: '/registrations', icon: DocumentTextIcon },
+  { label: 'Analytics', href: '/analytics', icon: ChartBarIcon, adminOnly: true },
+  { label: 'Departments', href: '/admin/departments', icon: UserGroupIcon, adminOnly: true },
+  { label: 'Users', href: '/admin/users', icon: UserGroupIcon, adminOnly: true },
+  { label: 'Admin', href: '/admin', icon: CogIcon, adminOnly: true },
+]
 
-export function Navigation({ userRole = 'ADMIN', userName = 'John Doe' }: Readonly<NavigationProps>) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const pathname = usePathname()
-  const router = useRouter()
-  const { logout } = useAuthStore()
+export default function Navigation() {
+  const { data: session } = useSession()
 
-  const navItems = navigationItems[userRole]
-
-  const isActive = (href: string) => {
-    return pathname ? pathname === href || pathname.startsWith(href + '/') : false
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/login' })
   }
 
-  const handleLogout = () => {
-    logout()
-    router.push('/login')
+  if (!session) {
+    return null
   }
+
+  const isAdmin = session.user?.role === 'ADMIN'
 
   return (
-    <>
-      {/* Mobile menu overlay */}
-      {isMobileMenuOpen && (
-        <button
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setIsMobileMenuOpen(false)
-            }
-          }}
-          aria-label="Close mobile menu"
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      )}>
-        <div className="flex flex-col h-full">
+    <nav className="bg-white shadow-lg border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <Link href="/" className="flex items-center space-x-2">
+          <div className="flex items-center">
+            <Link href="/dashboard" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <GraduationCap className="h-5 w-5 text-white" />
+                <AcademicCapIcon className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900">ERP System</span>
             </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              <X className="h-5 w-5" />
-            </Button>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center space-x-8">
             {navItems.map((item) => {
-              const Icon = item.icon
-              const active = isActive(item.href)
+              if (item.adminOnly && !isAdmin) return null
               
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={cn(
-                    "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                    active
-                      ? "bg-blue-50 text-blue-700 border border-blue-200"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  )}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
                 >
-                  <Icon className={cn(
-                    "h-5 w-5",
-                    active ? "text-blue-700" : "text-gray-400"
-                  )} />
+                  <item.icon className="w-4 h-4" />
                   <span>{item.label}</span>
-                  {item.badge && (
-                    <Badge className="ml-auto text-xs bg-blue-100 text-blue-800">
-                      {item.badge}
-                    </Badge>
-                  )}
                 </Link>
               )
             })}
-          </nav>
+          </div>
 
-          {/* User profile */}
-          <div className="border-t border-gray-200 p-4">
-            <div className="relative">
-              <button
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-gray-50 transition-colors"
+          {/* User Menu */}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-600">
+              Welcome, {session.user?.name || session.user?.email}
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center space-x-1 text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              <ArrowRightCircleIcon className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile menu (simplified) */}
+      <div className="md:hidden">
+        <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-50">
+          {navItems.map((item) => {
+            if (item.adminOnly && !isAdmin) return null
+            
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
               >
-                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                  <User className="h-4 w-4 text-gray-600" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-gray-900">{userName}</p>
-                  <p className="text-xs text-gray-500 capitalize">{userRole.toLowerCase()}</p>
-                </div>
-                <ChevronDown className={cn(
-                  "h-4 w-4 text-gray-400 transition-transform",
-                  isProfileOpen && "rotate-180"
-                )} />
-              </button>
-
-              {isProfileOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg py-2">
-                  <Link
-                    href="/profile"
-                    className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                    onClick={() => {
-                      setIsProfileOpen(false)
-                      setIsMobileMenuOpen(false)
-                    }}
-                  >
-                    <User className="h-4 w-4" />
-                    <span>Profile</span>
-                  </Link>
-                  <Link
-                    href="/settings"
-                    className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                    onClick={() => {
-                      setIsProfileOpen(false)
-                      setIsMobileMenuOpen(false)
-                    }}
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                  <hr className="my-2" />
-                  <button
-                    className="flex items-center space-x-2 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 w-full text-left"
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span>Logout</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+                <item.icon className="w-4 h-4" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
         </div>
       </div>
-
-      {/* Top bar */}
-      <div className="lg:pl-64">
-        <div className="sticky top-0 z-30 flex h-16 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="lg:hidden"
-            onClick={() => setIsMobileMenuOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-
-          <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <div className="relative flex flex-1">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                className="block w-full border-0 py-0 pl-10 pr-0 text-gray-900 placeholder:text-gray-400 focus:ring-0 sm:text-sm"
-                placeholder="Search..."
-                type="search"
-              />
-            </div>
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
-                  3
-                </span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+    </nav>
   )
 }

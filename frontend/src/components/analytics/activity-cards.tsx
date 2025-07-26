@@ -15,7 +15,7 @@ import {
   ClipboardList
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import { Course } from '@/types'
+import { Course, CourseStatus } from '@/types'
 
 interface RecentActivity {
   id: string
@@ -277,6 +277,7 @@ export function EnhancedCourseCard({
                   ...course,
                   enrolledStudents: course.enrolledStudents ?? 0, // Ensure enrolledStudents is a number
                   description: '',
+                  status: course.status as CourseStatus,
                   createdAt: '', // Add a default or dynamic value
                   updatedAt: new Date().toISOString() // Add a default or dynamic value
                 })}

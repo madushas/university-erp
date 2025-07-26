@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { Registration, GradeUpdateRequest } from '@/types'
-import { optimizedApiService } from '@/services/optimized-api-service'
+import api from '@/lib/api'
 
 interface RegistrationState {
   registrations: Registration[]
@@ -39,7 +39,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
       set({ isLoading: true, error: null })
       
       // For admin, get all registrations - using status filter for paginated results
-      const registrations = await optimizedApiService.getRegistrationsByStatus('ENROLLED')
+      const registrations = await api.get<Registration[]>('/registrations?status=ENROLLED')
       
       set({
         registrations: registrations,
@@ -61,7 +61,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      const registrations = await optimizedApiService.getMyRegistrations()
+      const registrations = await api.get<Registration[]>('/registrations/my')
       
       set({
       registrations: registrations,
@@ -85,7 +85,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      const registration = await optimizedApiService.getRegistrationById(id)
+      const registration = await api.get<Registration>(`/registrations/${id}`)
       
       set({
         currentRegistration: registration,
@@ -105,7 +105,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      const registration = await optimizedApiService.enrollInCourse(courseId)
+      const registration = await api.post<Registration>('/registrations', { courseId })
       
       // Add new registration to the list
       set((state) => ({
@@ -129,7 +129,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      await optimizedApiService.dropCourse(courseId)
+      await api.delete(`/registrations/course/${courseId}`)
       
       // Remove registration from the list based on courseId
       set((state) => ({
@@ -152,7 +152,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      await optimizedApiService.deleteRegistration(registrationId)
+      await api.delete(`/registrations/${registrationId}`)
       
       // Remove registration from the list
       set((state) => ({
@@ -175,7 +175,7 @@ export const useRegistrationStore = create<RegistrationState & RegistrationActio
     try {
       set({ isLoading: true, error: null })
       
-      const updatedRegistration = await optimizedApiService.updateGrade(registrationId, gradeData.grade)
+      const updatedRegistration = await api.put<Registration>(`/registrations/${registrationId}/grade`, { grade: gradeData.grade })
       
       // Update the registration in the list
       set((state) => ({

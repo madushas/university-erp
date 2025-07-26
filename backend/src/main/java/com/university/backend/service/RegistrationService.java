@@ -209,7 +209,7 @@ public class RegistrationService {
             .email(registration.getUser().getEmail())
             .firstName(registration.getUser().getFirstName())
             .lastName(registration.getUser().getLastName())
-            .role(registration.getUser().getRole().name())
+            .role(registration.getUser().getRole())
             .build();
 
         CourseResponse courseResponse = CourseResponse.builder()

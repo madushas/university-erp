@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { Course, CourseCreateRequest } from '@/types'
-import { optimizedApiService } from '@/services/optimized-api-service'
+import api from '@/lib/api'
 
 interface CourseState {
   courses: Course[]
@@ -36,12 +36,12 @@ export const useCourseStore = create<CourseState & CourseActions>()((set) => ({
     try {
       set({ isLoading: true, error: null })
       
-      const response = await optimizedApiService.getCourses(page, size)
+      const response = await api.get<{ courses: Course[], totalPages: number }>(`/courses?page=${page}&size=${size}`)
       
       set({
-        courses: response.content,
+        courses: response.courses,
         totalPages: response.totalPages,
-        currentPage: response.number,
+        currentPage: page,
         isLoading: false,
       })
     } catch (error: unknown) {
@@ -57,7 +57,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set) => ({
     try {
       set({ isLoading: true, error: null })
       
-      const course = await optimizedApiService.getCourseById(id)
+      const course = await api.get<Course>(`/courses/${id}`)
       
       set({
         currentCourse: course,
@@ -77,7 +77,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set) => ({
     try {
       set({ isLoading: true, error: null })
       
-      const course = await optimizedApiService.createCourse(courseData)
+      const course = await api.post<Course>('/courses', courseData)
       
       // Add new course to the list
       set((state) => ({
@@ -101,7 +101,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set) => ({
     try {
       set({ isLoading: true, error: null })
       
-      const updatedCourse = await optimizedApiService.updateCourse(id, courseData)
+      const updatedCourse = await api.put<Course>(`/courses/${id}`, courseData)
       
       // Update course in the list
       set((state) => ({
@@ -128,7 +128,7 @@ export const useCourseStore = create<CourseState & CourseActions>()((set) => ({
     try {
       set({ isLoading: true, error: null })
       
-      await optimizedApiService.deleteCourse(id)
+      await api.delete(`/courses/${id}`)
       
       // Remove course from the list
       set((state) => ({
@@ -153,8 +153,8 @@ export const useCourseStore = create<CourseState & CourseActions>()((set) => ({
       set({ isLoading: true, error: null })
       
       // For now, use client-side filtering
-      const response = await optimizedApiService.getCourses(0, 100) // Get more courses for search
-      const filteredCourses = response.content.filter(course =>
+      const response = await api.get<{ courses: Course[], totalPages: number }>('/courses?page=0&size=100') // Get more courses for search
+      const filteredCourses = response.courses.filter(course =>
         course.title.toLowerCase().includes(query.toLowerCase()) ||
         course.code.toLowerCase().includes(query.toLowerCase()) ||
         course.instructor.toLowerCase().includes(query.toLowerCase())

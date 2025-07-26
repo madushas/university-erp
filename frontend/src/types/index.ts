@@ -4,7 +4,16 @@ export interface User {
   email: string
   firstName: string
   lastName: string
-  role: UserRole
+  role: Role
+  employeeId?: string
+  studentId?: string
+  department?: string
+  yearOfStudy?: number
+  gpa?: number
+  address?: string
+  phoneNumber?: string
+  dateOfBirth?: string
+  status?: UserStatus
   createdAt: string
   updatedAt: string
 }
@@ -18,7 +27,13 @@ export interface Course {
   maxStudents: number
   enrolledStudents: number
   instructor: string
+  instructorId?: number
   schedule: string
+  department?: string
+  prerequisites?: string[]
+  fee?: number
+  semester?: string
+  status?: CourseStatus
   createdAt: string
   updatedAt: string
 }
@@ -30,19 +45,61 @@ export interface Registration {
   registrationDate: string
   status: RegistrationStatus
   grade?: string
+  paymentStatus?: PaymentStatus
+  attendancePercentage?: number
   createdAt: string
   updatedAt: string
 }
 
+export interface Department {
+  id: number
+  name: string
+  code: string
+  description?: string
+  headOfDepartment?: string
+  status?: DepartmentStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export type Role = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN'
+
 export enum UserRole {
   STUDENT = 'STUDENT',
+  INSTRUCTOR = 'INSTRUCTOR',
   ADMIN = 'ADMIN'
+}
+
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  SUSPENDED = 'SUSPENDED'
+}
+
+export enum CourseStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  DRAFT = 'DRAFT',
+  ARCHIVED = 'ARCHIVED'
+}
+
+export enum DepartmentStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE'
 }
 
 export enum RegistrationStatus {
   ENROLLED = 'ENROLLED',
   COMPLETED = 'COMPLETED',
-  DROPPED = 'DROPPED'
+  DROPPED = 'DROPPED',
+  PENDING = 'PENDING'
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  OVERDUE = 'OVERDUE',
+  CANCELLED = 'CANCELLED'
 }
 
 // API Request/Response Types
@@ -161,4 +218,51 @@ export interface EnrollmentTrendItem {
   enrolled: number
   completed: number
   dropped: number
+}
+
+// Request Types
+export interface CreateUserRequest {
+  username: string
+  email: string
+  firstName: string
+  lastName: string
+  password: string
+  role: Role
+  employeeId?: string
+  studentId?: string
+  phoneNumber?: string
+  dateOfBirth?: string
+  address?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  country?: string
+  department?: string
+  yearOfStudy?: number
+}
+
+export interface UpdateUserRequest {
+  username?: string
+  email?: string
+  firstName?: string
+  lastName?: string
+  role?: Role
+  employeeId?: string
+  studentId?: string
+  phoneNumber?: string
+  dateOfBirth?: string
+  address?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  country?: string
+  department?: string
+  yearOfStudy?: number
+}
+
+export interface CreateDepartmentRequest {
+  name: string
+  code: string
+  description?: string
+  headOfDepartment?: string
 }

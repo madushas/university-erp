@@ -64,4 +64,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     
     @Query("SELECT AVG(c.courseFee) FROM Course c WHERE c.department = :department")
     Double getAverageCourseFeeByDepartment(@Param("department") String department);
+    
+    boolean existsByDepartment(String department);
 }

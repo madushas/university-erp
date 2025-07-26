@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { useAuthStore } from '@/store/auth-store'
 import { Button } from '@/components/ui/button'
 import { 
   HomeIcon, 
@@ -20,18 +20,20 @@ interface NavigationProps {
 
 export default function Navigation({ children }: NavigationProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, logout } = useAuthStore()
+  const { data: session } = useSession()
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Courses', href: '/courses', icon: BookOpenIcon },
     { name: 'Registrations', href: '/registrations', icon: ClipboardDocumentListIcon },
-    ...(user?.role === 'ADMIN' ? [{ name: 'Analytics', href: '/analytics', icon: ChartBarIcon }] : []),
+    ...(session?.user?.role === 'ADMIN' ? [
+      { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
+      { name: 'Users', href: '/admin/users', icon: UserCircleIcon }
+    ] : []),
   ]
 
-  const handleLogout = () => {
-    logout()
-    window.location.href = '/login'
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/login' })
   }
 
   return (
@@ -39,7 +41,12 @@ export default function Navigation({ children }: NavigationProps) {
       {/* Mobile sidebar */}
       <div className={`relative z-40 lg:hidden ${sidebarOpen ? '' : 'hidden'}`}>
         <div className="fixed inset-0 flex z-40">
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+          <button
+            type="button"
+            className="fixed inset-0 bg-gray-600 bg-opacity-75 border-none cursor-pointer"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
+          />
           <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
             <div className="absolute top-0 right-0 -mr-12 pt-2">
               <button
@@ -122,14 +129,14 @@ export default function Navigation({ children }: NavigationProps) {
             <div className="flex justify-between h-16">
               <div className="flex items-center">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Welcome back, {user?.firstName} {user?.lastName}
+                  Welcome back, {session?.user?.name?.split(' ')[0]} {session?.user?.name?.split(' ')[1] || ''}
                 </h2>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <UserCircleIcon className="h-6 w-6 text-gray-500" />
                   <span className="text-sm text-gray-700">
-                    {user?.username} ({user?.role})
+                    {session?.user?.name.split(' ')[0]} ({session?.user?.role})
                   </span>
                 </div>
                 <Button

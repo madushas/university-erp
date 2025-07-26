@@ -70,25 +70,31 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
                 // Public endpoints
-                auth.requestMatchers("/auth/**").permitAll();
-                auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll();
-                auth.requestMatchers("/actuator/health").permitAll();
+                auth.requestMatchers("/api/auth/**").permitAll();
+                auth.requestMatchers("/api/swagger-ui/**", "/v3/api-docs/**").permitAll();
+                auth.requestMatchers("/api/actuator/health").permitAll();
                 
                 // Course endpoints
-                auth.requestMatchers(HttpMethod.GET, "/courses/**").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.POST, "/courses").hasRole("ADMIN");
-                auth.requestMatchers(HttpMethod.PUT, "/courses/**").hasRole("ADMIN");
-                auth.requestMatchers(HttpMethod.DELETE, "/courses/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/courses/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.POST, "/api/courses").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PUT, "/api/courses/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/courses/**").hasRole("ADMIN");
                 
                 // Registration endpoints
-                auth.requestMatchers(HttpMethod.GET, "/registrations/**").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.POST, "/registrations").hasRole("STUDENT");
-                auth.requestMatchers(HttpMethod.PUT, "/registrations/**").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.DELETE, "/registrations/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/registrations/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.POST, "/api/registrations").hasRole("STUDENT");
+                auth.requestMatchers(HttpMethod.PUT, "/api/registrations/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/registrations/**").hasAnyRole("STUDENT", "ADMIN");
                 
                 // User endpoints
-                auth.requestMatchers(HttpMethod.GET, "/users/me").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.GET, "/users/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/users/me").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/users/**").hasRole("ADMIN");
+                
+                // Admin endpoints - All require ADMIN role
+                auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
+                
+                // Analytics endpoints
+                auth.requestMatchers("/api/analytics/**").hasAnyRole("STUDENT", "ADMIN");
                 
                 // All other requests require authentication
                 auth.anyRequest().authenticated();

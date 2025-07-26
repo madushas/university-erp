@@ -3,9 +3,9 @@ spring:
     name: university-course-management
   
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/university}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/postgres}
     username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:}
+    password: ${DATABASE_PASSWORD:12345}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -24,8 +24,6 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
-  servlet:
-    context-path: /api
 
 management:
   endpoints:
@@ -45,7 +43,7 @@ logging:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:}
+    secret: ${JWT_SECRET:local-development-secret-key-change-in-production-This-123456789-@#$%^&*-jjasfasfnajfbeh}
     expiration: ${JWT_EXPIRATION:86400000} # 24 hours
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
   cors:
@@ -54,7 +52,7 @@ app:
 # API Documentation
 springdoc:
   api-docs:
-    path: /v3/api-docs
+    path: swagger-ui/v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
     operationsSorter: method

@@ -3,6 +3,8 @@ package com.university.backend.repository;
 import com.university.backend.entity.PaymentStatus;
 import com.university.backend.entity.Registration;
 import com.university.backend.entity.RegistrationStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -80,4 +82,15 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
     
     @Query("SELECT SUM(r.courseFeePaid) FROM Registration r WHERE r.course.department = :department AND r.paymentStatus = 'PAID'")
     Double getTotalRevenueByDepartment(@Param("department") String department);
+    
+    Page<Registration> findByStatus(RegistrationStatus status, Pageable pageable);
+    
+    Page<Registration> findByPaymentStatus(PaymentStatus paymentStatus, Pageable pageable);
+    
+    @Query("SELECT r FROM Registration r WHERE r.status = :status AND r.paymentStatus = :paymentStatus")
+    Page<Registration> findByStatusAndPaymentStatus(@Param("status") RegistrationStatus status, 
+                                                    @Param("paymentStatus") PaymentStatus paymentStatus, 
+                                                    Pageable pageable);
+    
+    Long countByPaymentStatus(PaymentStatus paymentStatus);
 }

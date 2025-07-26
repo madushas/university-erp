@@ -1,42 +1,36 @@
-'use client'
+'use client';
 
-import { useAuthStore } from '@/store/auth-store'
-import ProtectedRoute from '@/components/protected-route'
-import Navigation from '@/components/navigation'
-import { SimpleAnalyticsDashboard } from '@/components/analytics/simple-analytics-dashboard'
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
+import { SimpleAnalyticsDashboard } from '@/components/analytics/simple-analytics-dashboard';
 
 export default function AnalyticsPage() {
-  const { user } = useAuthStore()
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-  if (user?.role !== 'ADMIN') {
-    return (
-      <ProtectedRoute>
-        <Navigation>
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
-              <p className="text-gray-600">You don&apos;t have permission to access analytics.</p>
-            </div>
-          </div>
-        </Navigation>
-      </ProtectedRoute>
-    )
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (!session?.user) {
+      router.push('/login');
+      return;
+    }
+    if (session.user.role !== 'ADMIN') {
+      router.push('/dashboard');
+      return;
+    }
+  }, [session, status, router]);
+
+  if (status === 'loading') {
+    return <div>Loading...</div>;
+  }
+
+  if (!session?.user || session.user.role !== 'ADMIN') {
+    return <div>Access denied</div>;
   }
 
   return (
-    <ProtectedRoute requiredRole="ADMIN">
-      <Navigation>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
-            <p className="mt-2 text-gray-600">
-              Comprehensive analytics and insights for your university system.
-            </p>
-          </div>
-          
-          <SimpleAnalyticsDashboard userRole="ADMIN" />
-        </div>
-      </Navigation>
-    </ProtectedRoute>
-  )
+    <SimpleAnalyticsDashboard />
+  );
 }

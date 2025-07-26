@@ -3,6 +3,8 @@ package com.university.backend.repository;
 import com.university.backend.entity.Role;
 import com.university.backend.entity.User;
 import com.university.backend.entity.UserStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,12 +24,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     boolean existsByEmail(String email);
     
+    boolean existsByEmployeeId(String employeeId);
+    
+    boolean existsByStudentId(String studentId);
+    
     List<User> findByRole(Role role);
+    
+    Page<User> findByRole(Role role, Pageable pageable);
     
     List<User> findByStatus(UserStatus status);
     
+    Page<User> findByStatus(UserStatus status, Pageable pageable);
+    
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.status = :status")
     List<User> findByRoleAndStatus(@Param("role") Role role, @Param("status") UserStatus status);
+    
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.status = :status")
+    Page<User> findByRoleAndStatus(@Param("role") Role role, @Param("status") UserStatus status, Pageable pageable);
     
     @Query("SELECT u FROM User u WHERE u.department = :department")
     List<User> findByDepartment(@Param("department") String department);
@@ -55,4 +68,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.registrations WHERE u.username = :username")
     Optional<User> findByUsernameWithRegistrations(@Param("username") String username);
+    
+    boolean existsByDepartment(String department);
 }
