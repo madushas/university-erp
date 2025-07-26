@@ -23,8 +23,12 @@ public class AcademicSemester {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String code; // e.g., "2024-FALL", "2025-SPRING"
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "academic_year_id")
+    private AcademicYear academicYear;
+
+    @Column(nullable = false)
+    private String code; // e.g., "FALL2024", "SPRING2025"
 
     @Column(nullable = false)
     private String name; // e.g., "Fall 2024", "Spring 2025"
@@ -47,11 +51,11 @@ public class AcademicSemester {
     @Column(name = "withdrawal_deadline")
     private LocalDate withdrawalDeadline;
 
-    @Column(name = "final_exam_start")
-    private LocalDate finalExamStart;
+    @Column(name = "final_exam_start_date")
+    private LocalDate finalExamStartDate;
 
-    @Column(name = "final_exam_end")
-    private LocalDate finalExamEnd;
+    @Column(name = "final_exam_end_date")
+    private LocalDate finalExamEndDate;
 
     @Column(name = "grade_submission_deadline")
     private LocalDate gradeSubmissionDeadline;
@@ -68,4 +72,8 @@ public class AcademicSemester {
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @org.springframework.data.annotation.LastModifiedDate
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }

@@ -112,4 +112,12 @@ public class Course {
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Registration> registrations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<CoursePrerequisite> coursePrerequisites = new ArrayList<>();
+
+    @OneToMany(mappedBy = "prerequisiteCourse", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<CoursePrerequisite> prerequisiteFor = new ArrayList<>();
 }

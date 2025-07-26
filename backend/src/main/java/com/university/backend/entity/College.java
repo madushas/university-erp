@@ -6,18 +6,22 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "departments")
+@Table(name = "colleges")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-public class Department {
+public class College {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -32,51 +36,32 @@ public class Department {
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "college_id")
-    private College college;
+    @JoinColumn(name = "dean_id")
+    private User dean;
 
-    @Column(name = "head_of_department")
-    private String headOfDepartment;
+    @Column(name = "established_date")
+    private LocalDate establishedDate;
 
-    @Column(name = "head_email")
-    private String headEmail;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "head_id")
-    private User head;
-
-    @Column(name = "building")
-    private String building;
-
-    @Column(name = "room_number")
-    private String roomNumber;
-
-    @Column(name = "phone_number")
-    private String phoneNumber;
-
-    @Column(name = "email")
-    private String email;
+    @Column(name = "accreditation_info", columnDefinition = "TEXT")
+    private String accreditationInfo;
 
     @Column(name = "website")
     private String website;
 
-    @Column(name = "budget_allocation", precision = 15, scale = 2)
-    private java.math.BigDecimal budgetAllocation;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     @Builder.Default
-    private DepartmentStatus status = DepartmentStatus.ACTIVE;
+    private CollegeStatus status = CollegeStatus.ACTIVE;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @org.springframework.data.annotation.LastModifiedDate
+    @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "college", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
-    private java.util.List<AcademicProgram> academicPrograms = new java.util.ArrayList<>();
+    private List<Department> departments = new ArrayList<>();
 }

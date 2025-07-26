@@ -72,7 +72,7 @@ public class SecurityConfig {
                 // Public endpoints
                 auth.requestMatchers("/api/auth/**").permitAll();
                 auth.requestMatchers("/api/swagger-ui/**", "/v3/api-docs/**").permitAll();
-                auth.requestMatchers("/api/actuator/health").permitAll();
+                auth.requestMatchers("/actuator/health").permitAll();
                 
                 // Course endpoints
                 auth.requestMatchers(HttpMethod.GET, "/api/courses/**").hasAnyRole("STUDENT", "ADMIN");

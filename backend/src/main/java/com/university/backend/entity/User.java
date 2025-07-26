@@ -86,6 +86,19 @@ public class User {
     private Role role;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "user_type", nullable = false)
+    @Builder.Default
+    private UserType userType = UserType.STUDENT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "employee_type")
+    private EmployeeType employeeType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "academic_level")
+    private AcademicLevel academicLevel;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status")
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
@@ -95,6 +108,46 @@ public class User {
 
     @Column(name = "graduation_date")
     private LocalDate graduationDate;
+
+    @Column(name = "admission_date")
+    private LocalDate admissionDate;
+
+    @Column(name = "expected_graduation_date")
+    private LocalDate expectedGraduationDate;
+
+    @Column(name = "emergency_contact_name")
+    private String emergencyContactName;
+
+    @Column(name = "emergency_contact_phone")
+    private String emergencyContactPhone;
+
+    @Column(name = "emergency_contact_relationship")
+    private String emergencyContactRelationship;
+
+    @Column(name = "profile_picture_url")
+    private String profilePictureUrl;
+
+    @Column(name = "preferred_language")
+    @Builder.Default
+    private String preferredLanguage = "en";
+
+    @Column(name = "timezone")
+    @Builder.Default
+    private String timezone = "UTC";
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @Column(name = "password_changed_at")
+    @Builder.Default
+    private LocalDateTime passwordChangedAt = LocalDateTime.now();
+
+    @Column(name = "account_locked_until")
+    private LocalDateTime accountLockedUntil;
+
+    @Column(name = "failed_login_attempts")
+    @Builder.Default
+    private Integer failedLoginAttempts = 0;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
