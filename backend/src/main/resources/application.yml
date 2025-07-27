@@ -29,6 +29,12 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  undertow:
+    threads:
+      io: ${UNDERTOW_IO_THREADS:4}
+      worker: ${UNDERTOW_WORKER_THREADS:64}
+    buffer-size: ${UNDERTOW_BUFFER_SIZE:1024}
+    direct-buffers: ${UNDERTOW_DIRECT_BUFFERS:true}
 
 management:
   endpoints:

@@ -31,6 +31,12 @@ server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: /api
+  undertow:
+    threads:
+      io: 2
+      worker: 32
+    buffer-size: 1024
+    direct-buffers: true
 
 management:
   endpoints:
