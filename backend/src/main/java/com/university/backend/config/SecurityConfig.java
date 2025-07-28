@@ -69,32 +69,41 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
-                // Public endpoints
-                auth.requestMatchers("/api/auth/**").permitAll();
-                auth.requestMatchers("/api/swagger-ui/**", "/v3/api-docs/**").permitAll();
+                // Public endpoints (with /api/v1 prefix)
+                auth.requestMatchers("/api/v1/auth/**").permitAll();
+                auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll();
                 auth.requestMatchers("/actuator/health").permitAll();
                 
                 // Course endpoints
-                auth.requestMatchers(HttpMethod.GET, "/api/courses/**").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.POST, "/api/courses").hasRole("ADMIN");
-                auth.requestMatchers(HttpMethod.PUT, "/api/courses/**").hasRole("ADMIN");
-                auth.requestMatchers(HttpMethod.DELETE, "/api/courses/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/courses/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/courses").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PUT, "/api/v1/courses/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/v1/courses/**").hasRole("ADMIN");
                 
                 // Registration endpoints
-                auth.requestMatchers(HttpMethod.GET, "/api/registrations/**").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.POST, "/api/registrations").hasRole("STUDENT");
-                auth.requestMatchers(HttpMethod.PUT, "/api/registrations/**").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.DELETE, "/api/registrations/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/registrations").hasRole("STUDENT");
+                auth.requestMatchers(HttpMethod.PUT, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN");
                 
                 // User endpoints
-                auth.requestMatchers(HttpMethod.GET, "/api/users/me").hasAnyRole("STUDENT", "ADMIN");
-                auth.requestMatchers(HttpMethod.GET, "/api/users/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/users/me").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/users/**").hasRole("ADMIN");
                 
                 // Admin endpoints - All require ADMIN role
-                auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
+                auth.requestMatchers("/api/v1/admin/**").hasRole("ADMIN");
                 
                 // Analytics endpoints
-                auth.requestMatchers("/api/analytics/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers("/api/v1/analytics/**").hasAnyRole("STUDENT", "ADMIN");
+                
+                // Financial endpoints
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/financial/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/financial/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.PUT, "/api/v1/financial/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/v1/financial/**").hasRole("ADMIN");
+                
+                // HR endpoints
+                auth.requestMatchers("/api/v1/hr/**").hasRole("ADMIN");
                 
                 // All other requests require authentication
                 auth.anyRequest().authenticated();
@@ -110,7 +119,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList(allowedOrigins.split(",")));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

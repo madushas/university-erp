@@ -1,7 +1,7 @@
 package com.university.backend.dto.response;
 
-import com.university.backend.entity.Role;
-import com.university.backend.entity.UserStatus;
+import com.university.backend.modules.core.entity.Role;
+import com.university.backend.modules.core.entity.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

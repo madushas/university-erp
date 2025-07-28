@@ -1,6 +1,6 @@
 package com.university.backend.dto.request;
 
-import com.university.backend.entity.BillingStatus;
+import com.university.backend.modules.financial.entity.BillingStatus;
 import lombok.Data;
 
 @Data

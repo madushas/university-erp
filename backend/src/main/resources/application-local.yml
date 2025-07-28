@@ -2,6 +2,13 @@ spring:
   application:
     name: university-course-management
   
+  mvc:
+    static-path-pattern: /static/**
+  
+  web:
+    resources:
+      static-locations: classpath:/static/
+  
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/erp_stuff}
     username: ${DATABASE_USERNAME:postgres}
@@ -29,8 +36,6 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
-  servlet:
-    context-path: /api
   undertow:
     threads:
       io: 2
@@ -51,12 +56,14 @@ logging:
   level:
     '[com.university.backend]': ${LOG_LEVEL:DEBUG}
     '[org.springframework.security]': ${SECURITY_LOG_LEVEL:DEBUG}
+    '[org.springframework.web]': DEBUG
+    '[org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping]': DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
 app:
   jwt:
-    secret: ${JWT_SECRET:local-development-secret-key-change-in-production}
+    secret: ${JWT_SECRET:local-development-secret-key-change-in-production-this-needs-to-be-at-least-512-bits-long-for-HS512-algorithm-so-adding-more-characters-here}
     expiration: ${JWT_EXPIRATION:86400000} # 24 hours
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
   cors:

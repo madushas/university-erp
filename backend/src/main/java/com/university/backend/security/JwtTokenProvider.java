@@ -25,7 +25,19 @@ public class JwtTokenProvider {
     private int refreshExpirationInMs;
 
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        // Ensure the key is at least 64 bytes for HS512
+        byte[] keyBytes = jwtSecret.getBytes();
+        if (keyBytes.length < 64) {
+            // Pad the key to 64 bytes
+            byte[] paddedKey = new byte[64];
+            System.arraycopy(keyBytes, 0, paddedKey, 0, keyBytes.length);
+            // Fill remaining bytes with the key repeated
+            for (int i = keyBytes.length; i < 64; i++) {
+                paddedKey[i] = keyBytes[i % keyBytes.length];
+            }
+            return Keys.hmacShaKeyFor(paddedKey);
+        }
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(Authentication authentication) {
