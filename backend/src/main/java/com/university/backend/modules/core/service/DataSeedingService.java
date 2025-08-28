@@ -2,6 +2,10 @@ package com.university.backend.modules.core.service;
 
 import com.university.backend.modules.academic.entity.AcademicSemester;
 import com.university.backend.modules.academic.entity.SemesterStatus;
+import com.university.backend.modules.academic.entity.AcademicProgram;
+import com.university.backend.modules.academic.entity.ProgramType;
+import com.university.backend.modules.academic.entity.AcademicYear;
+import com.university.backend.modules.academic.entity.AcademicYearStatus;
 import com.university.backend.modules.academic.entity.Course;
 import com.university.backend.modules.academic.entity.CourseStatus;
 import com.university.backend.modules.academic.entity.Department;
@@ -10,6 +14,8 @@ import com.university.backend.modules.academic.entity.PaymentStatus;
 import com.university.backend.modules.academic.entity.Registration;
 import com.university.backend.modules.academic.entity.RegistrationStatus;
 import com.university.backend.modules.academic.repository.AcademicSemesterRepository;
+import com.university.backend.modules.academic.repository.AcademicProgramRepository;
+import com.university.backend.modules.academic.repository.AcademicYearRepository;
 import com.university.backend.modules.academic.repository.CourseRepository;
 import com.university.backend.modules.academic.repository.DepartmentRepository;
 import com.university.backend.modules.academic.repository.RegistrationRepository;
@@ -45,6 +51,8 @@ public class DataSeedingService implements CommandLineRunner {
     private final RegistrationRepository registrationRepository;
     private final DepartmentRepository departmentRepository;
     private final AcademicSemesterRepository academicSemesterRepository;
+    private final AcademicProgramRepository academicProgramRepository;
+    private final AcademicYearRepository academicYearRepository;
     private final PasswordEncoder passwordEncoder;
     
     private final Random random = new Random();
@@ -52,15 +60,18 @@ public class DataSeedingService implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        // Only seed if database is empty
-        if (userRepository.count() > 0) {
-            log.info("Database already contains data, skipping seeding");
-            return;
-        }
-
         log.info("Starting data seeding process...");
         
         try {
+            // Always seed academic data if missing
+            seedAcademicEntitiesIfNeeded();
+            
+            // Only seed if database is empty for other entities
+            if (userRepository.count() > 0) {
+                log.info("Database already contains user data, skipping user/course seeding");
+                return;
+            }
+            
             seedDepartments();
             seedAcademicSemesters();
             seedUsers();
@@ -70,6 +81,22 @@ public class DataSeedingService implements CommandLineRunner {
             log.info("Data seeding completed successfully!");
         } catch (Exception e) {
             log.error("Error during data seeding: ", e);
+        }
+    }
+    
+    private void seedAcademicEntitiesIfNeeded() {
+        // Seed academic years if missing
+        if (academicYearRepository.count() == 0) {
+            seedAcademicYears();
+        } else {
+            log.info("Academic years already exist, skipping");
+        }
+        
+        // Seed academic programs if missing
+        if (academicProgramRepository.count() == 0) {
+            seedAcademicPrograms();
+        } else {
+            log.info("Academic programs already exist, skipping");
         }
     }
 
@@ -253,7 +280,7 @@ public class DataSeedingService implements CommandLineRunner {
             User.builder()
                 .username("admin")
                 .email("admin@university.edu")
-                .password(passwordEncoder.encode("admin123"))
+                .password(passwordEncoder.encode("password"))
                 .firstName("System")
                 .lastName("Administrator")
                 .employeeId("EMP001")
@@ -266,7 +293,7 @@ public class DataSeedingService implements CommandLineRunner {
             User.builder()
                 .username("registrar")
                 .email("registrar@university.edu")
-                .password(passwordEncoder.encode("reg123"))
+                .password(passwordEncoder.encode("password"))
                 .firstName("Jane")
                 .lastName("Smith")
                 .employeeId("EMP002")
@@ -292,7 +319,7 @@ public class DataSeedingService implements CommandLineRunner {
             faculty.add(User.builder()
                 .username(username)
                 .email(username + "@university.edu")
-                .password(passwordEncoder.encode("faculty123"))
+                .password(passwordEncoder.encode("password"))
                 .firstName(firstName)
                 .lastName(lastName)
                 .employeeId("FAC" + String.format("%03d", i + 1))
@@ -323,7 +350,7 @@ public class DataSeedingService implements CommandLineRunner {
             students.add(User.builder()
                 .username(username)
                 .email(username + "@student.university.edu")
-                .password(passwordEncoder.encode("student123"))
+                .password(passwordEncoder.encode("password"))
                 .firstName(firstName)
                 .lastName(lastName)
                 .studentId("STU" + String.format("%06d", 2024001 + i))
@@ -851,5 +878,74 @@ public class DataSeedingService implements CommandLineRunner {
             case "F" -> 0.0;
             default -> null;
         };
+    }
+
+    private void seedAcademicYears() {
+        log.info("Seeding academic years...");
+        
+        List<AcademicYear> academicYears = Arrays.asList(
+            AcademicYear.builder()
+                .code("2023-2024")
+                .startDate(LocalDate.of(2023, 9, 1))
+                .endDate(LocalDate.of(2024, 8, 31))
+                .status(AcademicYearStatus.ARCHIVED)
+                .build(),
+                
+            AcademicYear.builder()
+                .code("2024-2025")
+                .startDate(LocalDate.of(2024, 9, 1))
+                .endDate(LocalDate.of(2025, 8, 31))
+                .status(AcademicYearStatus.ACTIVE)
+                .build(),
+                
+            AcademicYear.builder()
+                .code("2025-2026")
+                .startDate(LocalDate.of(2025, 9, 1))
+                .endDate(LocalDate.of(2026, 8, 31))
+                .status(AcademicYearStatus.INACTIVE)
+                .build()
+        );
+        
+        academicYearRepository.saveAll(academicYears);
+        log.info("Seeded {} academic years", academicYears.size());
+    }
+    
+    private void seedAcademicPrograms() {
+        log.info("Seeding academic programs...");
+        
+        List<AcademicProgram> academicPrograms = Arrays.asList(
+            AcademicProgram.builder()
+                .code("CS-BS")
+                .name("Bachelor of Science in Computer Science")
+                .programType(ProgramType.UNDERGRADUATE)
+                .description("A comprehensive program covering fundamentals of computer science")
+                .creditRequirements(120)
+                .department(departmentRepository.findByCode("CS").orElse(null))
+                .degreeType("Bachelor of Science")
+                .build(),
+                
+            AcademicProgram.builder()
+                .code("MATH-BS")
+                .name("Bachelor of Science in Mathematics")
+                .programType(ProgramType.UNDERGRADUATE)
+                .description("A rigorous program in mathematical theory and applications")
+                .creditRequirements(120)
+                .department(departmentRepository.findByCode("MATH").orElse(null))
+                .degreeType("Bachelor of Science")
+                .build(),
+                
+            AcademicProgram.builder()
+                .code("CS-MS")
+                .name("Master of Science in Computer Science")
+                .programType(ProgramType.GRADUATE)
+                .description("Advanced graduate program in computer science")
+                .creditRequirements(36)
+                .department(departmentRepository.findByCode("CS").orElse(null))
+                .degreeType("Master of Science")
+                .build()
+        );
+        
+        academicProgramRepository.saveAll(academicPrograms);
+        log.info("Seeded {} academic programs", academicPrograms.size());
     }
 }

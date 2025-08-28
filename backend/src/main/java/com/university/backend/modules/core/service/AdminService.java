@@ -168,13 +168,15 @@ public class AdminService {
         User user = getUserById(id);
 
         // Check if username already exists (excluding current user)
-        if (!user.getUsername().equals(request.getUsername()) && 
+        if (request.getUsername() != null && !request.getUsername().trim().isEmpty() &&
+            !user.getUsername().equals(request.getUsername()) && 
             userRepository.existsByUsername(request.getUsername())) {
             throw new UserAlreadyExistsException("Username already exists: " + request.getUsername());
         }
 
         // Check if email already exists (excluding current user)
-        if (!user.getEmail().equals(request.getEmail()) && 
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty() &&
+            !user.getEmail().equals(request.getEmail()) && 
             userRepository.existsByEmail(request.getEmail())) {
             throw new UserAlreadyExistsException("Email already exists: " + request.getEmail());
         }
@@ -193,11 +195,19 @@ public class AdminService {
             throw new UserAlreadyExistsException("Student ID already exists: " + request.getStudentId());
         }
 
-        // Update user fields
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
+        // Update user fields (only if provided)
+        if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
+            user.setUsername(request.getUsername());
+        }
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+            user.setEmail(request.getEmail());
+        }
+        if (request.getFirstName() != null && !request.getFirstName().trim().isEmpty()) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null && !request.getLastName().trim().isEmpty()) {
+            user.setLastName(request.getLastName());
+        }
         user.setRole(request.getRole());
         user.setUserType(request.getUserType());
         user.setEmployeeType(request.getEmployeeType());
@@ -301,22 +311,46 @@ public class AdminService {
             .orElseThrow(() -> new DepartmentNotFoundException("Department not found with id: " + id));
 
         // Check if department code already exists (excluding current department)
-        if (!department.getCode().equals(request.getCode()) && 
+        if (request.getCode() != null && !request.getCode().trim().isEmpty() &&
+            !department.getCode().equals(request.getCode()) && 
             departmentRepository.existsByCode(request.getCode())) {
             throw new DepartmentAlreadyExistsException("Department with code " + request.getCode() + " already exists");
         }
 
-        department.setName(request.getName());
-        department.setCode(request.getCode());
-        department.setDescription(request.getDescription());
-        department.setHeadOfDepartment(request.getHeadOfDepartment());
-        department.setHeadEmail(request.getHeadEmail());
-        department.setBuilding(request.getBuilding());
-        department.setRoomNumber(request.getRoomNumber());
-        department.setPhoneNumber(request.getPhoneNumber());
-        department.setEmail(request.getEmail());
-        department.setWebsite(request.getWebsite());
-        department.setBudgetAllocation(request.getBudgetAllocation());
+        // Only update fields that are provided (not null or empty)
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            department.setName(request.getName());
+        }
+        if (request.getCode() != null && !request.getCode().trim().isEmpty()) {
+            department.setCode(request.getCode());
+        }
+        if (request.getDescription() != null) {
+            department.setDescription(request.getDescription());
+        }
+        if (request.getHeadOfDepartment() != null && !request.getHeadOfDepartment().trim().isEmpty()) {
+            department.setHeadOfDepartment(request.getHeadOfDepartment());
+        }
+        if (request.getHeadEmail() != null && !request.getHeadEmail().trim().isEmpty()) {
+            department.setHeadEmail(request.getHeadEmail());
+        }
+        if (request.getBuilding() != null && !request.getBuilding().trim().isEmpty()) {
+            department.setBuilding(request.getBuilding());
+        }
+        if (request.getRoomNumber() != null && !request.getRoomNumber().trim().isEmpty()) {
+            department.setRoomNumber(request.getRoomNumber());
+        }
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
+            department.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+            department.setEmail(request.getEmail());
+        }
+        if (request.getWebsite() != null && !request.getWebsite().trim().isEmpty()) {
+            department.setWebsite(request.getWebsite());
+        }
+        if (request.getBudgetAllocation() != null) {
+            department.setBudgetAllocation(request.getBudgetAllocation());
+        }
         if (request.getStatus() != null) {
             department.setStatus(request.getStatus());
         }

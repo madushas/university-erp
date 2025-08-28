@@ -93,4 +93,9 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
                                                     Pageable pageable);
     
     Long countByPaymentStatus(PaymentStatus paymentStatus);
+    
+    // Additional methods needed for business logic
+    Long countByCourseIdAndStatus(Long courseId, RegistrationStatus status);
+    
+    List<Registration> findByUserIdAndStatus(Long userId, RegistrationStatus status);
 }

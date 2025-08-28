@@ -1,5 +1,11 @@
 package com.university.backend.modules.academic.entity;
 
 public enum RegistrationStatus {
-    PENDING, ENROLLED, COMPLETED, DROPPED
+    ENROLLED,
+    COMPLETED,
+    DROPPED,
+    PENDING,
+    WITHDRAWN,
+    FAILED,
+    TRANSFERRED
 }

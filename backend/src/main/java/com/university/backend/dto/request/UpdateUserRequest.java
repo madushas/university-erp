@@ -19,23 +19,18 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class UpdateUserRequest {
     
-    @NotBlank(message = "Username is required")
     @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String username;
     
-    @NotBlank(message = "Email is required")
     @Email(message = "Please provide a valid email address")
     private String email;
     
-    @NotBlank(message = "First name is required")
     @Size(max = 50, message = "First name cannot exceed 50 characters")
     private String firstName;
     
-    @NotBlank(message = "Last name is required")
     @Size(max = 50, message = "Last name cannot exceed 50 characters")
     private String lastName;
     
-    @NotNull(message = "Role is required")
     private Role role;
     
     // User type and employment fields

@@ -84,7 +84,7 @@ public class Registration {
     @Column(name = "status")
     @Enumerated(EnumType.STRING)
     @Builder.Default
-    private RegistrationStatus status = RegistrationStatus.PENDING;
+    private RegistrationStatus status = RegistrationStatus.ENROLLED;
 
     @Column(name = "completion_date")
     private LocalDateTime completionDate;

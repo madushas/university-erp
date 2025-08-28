@@ -3,11 +3,8 @@ package com.university.backend.modules.academic.entity;
 public enum PaymentStatus {
     PENDING,
     PAID,
-    PARTIALLY_PAID,
+    PARTIAL,
     OVERDUE,
     REFUNDED,
-    CANCELLED,
-    COMPLETED,
-    PROCESSING,
-    FAILED
+    CANCELLED
 }
