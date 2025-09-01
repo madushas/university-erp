@@ -12,6 +12,7 @@ import com.university.backend.modules.core.repository.UserRepository;
 import com.university.backend.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -30,94 +31,132 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final AuthenticationManager authenticationManager;
 
+    @Value("${app.jwt.expiration}")
+    private int jwtExpirationInMs;
+
     public AuthResponse login(LoginRequest request) {
         log.info("Attempting login for user: {}", request.getUsername());
         
-        Authentication authentication = authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(
-                request.getUsername(),
-                request.getPassword()
-            )
-        );
+        try {
+            // Validate input
+            if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+                throw new IllegalArgumentException("Username cannot be empty");
+            }
+            if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+                throw new IllegalArgumentException("Password cannot be empty");
+            }
 
-        String accessToken = tokenProvider.generateToken(authentication);
-        String refreshToken = tokenProvider.generateRefreshToken(authentication);
+            Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                    request.getUsername().trim(),
+                    request.getPassword()
+                )
+            );
 
-        User user = userRepository.findByUsername(request.getUsername())
-            .orElseThrow(() -> new RuntimeException("User not found after authentication"));
+            String accessToken = tokenProvider.generateToken(authentication);
+            String refreshToken = tokenProvider.generateRefreshToken(authentication);
 
-        log.info("User {} logged in successfully", request.getUsername());
+            User user = userRepository.findByUsername(request.getUsername().trim())
+                .orElseThrow(() -> new RuntimeException("User not found after authentication"));
 
-        return AuthResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .tokenType("Bearer")
-            .user(mapToUserResponse(user))
-            .build();
+            log.info("User {} logged in successfully", request.getUsername());
+
+            return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn((long) jwtExpirationInMs)
+                .user(mapToUserResponse(user))
+                .build();
+        } catch (Exception e) {
+            log.error("Login failed for user: {} - {}", request.getUsername(), e.getMessage());
+            throw e;
+        }
     }
 
     public AuthResponse register(RegisterRequest request) {
         log.info("Attempting to register user: {}", request.getUsername());
         
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new UserAlreadyExistsException("Username '" + request.getUsername() + "' already exists");
+        try {
+            // Validate input
+            if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+                throw new IllegalArgumentException("Username cannot be empty");
+            }
+            if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+                throw new IllegalArgumentException("Email cannot be empty");
+            }
+
+            String trimmedUsername = request.getUsername().trim();
+            String trimmedEmail = request.getEmail().trim();
+
+            if (userRepository.existsByUsername(trimmedUsername)) {
+                throw new UserAlreadyExistsException("Username '" + trimmedUsername + "' already exists");
+            }
+
+            if (userRepository.existsByEmail(trimmedEmail)) {
+                throw new UserAlreadyExistsException("Email '" + trimmedEmail + "' already exists");
+            }
+
+            User user = User.builder()
+                .username(trimmedUsername)
+                .email(trimmedEmail)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
+                .role(request.getRole() != null ? request.getRole() : Role.STUDENT)
+                .build();
+
+            User savedUser = userRepository.save(user);
+
+            String accessToken = tokenProvider.generateTokenFromUsername(savedUser.getUsername());
+            String refreshToken = tokenProvider.generateRefreshTokenFromUsername(savedUser.getUsername());
+
+            log.info("User {} registered successfully", trimmedUsername);
+
+            return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn((long) jwtExpirationInMs)
+                .user(mapToUserResponse(savedUser))
+                .build();
+        } catch (Exception e) {
+            log.error("Registration failed for user: {} - {}", request.getUsername(), e.getMessage());
+            throw e;
         }
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new UserAlreadyExistsException("Email '" + request.getEmail() + "' already exists");
-        }
-
-        User user = User.builder()
-            .username(request.getUsername())
-            .email(request.getEmail())
-            .password(passwordEncoder.encode(request.getPassword()))
-            .firstName(request.getFirstName())
-            .lastName(request.getLastName())
-            .role(request.getRole() != null ? request.getRole() : Role.STUDENT) // Use provided role or default to STUDENT
-            .build();
-
-        User savedUser = userRepository.save(user);
-
-        // Create authentication token for automatic login after registration
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-            savedUser.getUsername(), 
-            request.getPassword()
-        );
-
-        String accessToken = tokenProvider.generateTokenFromUsername(savedUser.getUsername());
-        String refreshToken = tokenProvider.generateRefreshTokenFromUsername(savedUser.getUsername());
-
-        log.info("User {} registered successfully", request.getUsername());
-
-        return AuthResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .tokenType("Bearer")
-            .user(mapToUserResponse(savedUser))
-            .build();
     }
 
     public AuthResponse refreshToken(RefreshTokenRequest request) {
-        String refreshToken = request.getRefreshToken();
-        
-        if (tokenProvider.validateToken(refreshToken)) {
-            String username = tokenProvider.getUsernameFromToken(refreshToken);
-            User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        try {
+            String refreshToken = request.getRefreshToken();
+            
+            if (refreshToken == null || refreshToken.trim().isEmpty()) {
+                throw new IllegalArgumentException("Refresh token cannot be empty");
+            }
+            
+            if (tokenProvider.validateToken(refreshToken)) {
+                String username = tokenProvider.getUsernameFromToken(refreshToken);
+                User user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
-            String newAccessToken = tokenProvider.generateTokenFromUsername(username);
-            String newRefreshToken = tokenProvider.generateRefreshTokenFromUsername(username);
+                String newAccessToken = tokenProvider.generateTokenFromUsername(username);
+                String newRefreshToken = tokenProvider.generateRefreshTokenFromUsername(username);
 
-            log.info("Token refreshed for user: {}", username);
+                log.info("Token refreshed for user: {}", username);
 
-            return AuthResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(newRefreshToken)
-                .tokenType("Bearer")
-                .user(mapToUserResponse(user))
-                .build();
-        } else {
-            throw new RuntimeException("Invalid refresh token");
+                return AuthResponse.builder()
+                    .accessToken(newAccessToken)
+                    .refreshToken(newRefreshToken)
+                    .tokenType("Bearer")
+                    .expiresIn((long) jwtExpirationInMs)
+                    .user(mapToUserResponse(user))
+                    .build();
+            } else {
+                throw new RuntimeException("Invalid refresh token");
+            }
+        } catch (Exception e) {
+            log.error("Token refresh failed: {}", e.getMessage());
+            throw e;
         }
     }
 

@@ -216,7 +216,7 @@ CREATE TABLE employee_leave_balances (
     id BIGSERIAL PRIMARY KEY,
     employee_id BIGINT NOT NULL REFERENCES employee_records(id) ON DELETE CASCADE,
     leave_type_id BIGINT NOT NULL REFERENCES leave_types(id),
-    year INTEGER NOT NULL,
+    "year" INTEGER NOT NULL,
     allocated_days DECIMAL(8,2) DEFAULT 0.00,
     used_days DECIMAL(8,2) DEFAULT 0.00,
     pending_days DECIMAL(8,2) DEFAULT 0.00,
@@ -226,8 +226,8 @@ CREATE TABLE employee_leave_balances (
     ) STORED,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     
-    UNIQUE(employee_id, leave_type_id, year),
-    CONSTRAINT chk_leave_balance_year CHECK (year >= 2000 AND year <= 2100)
+    UNIQUE(employee_id, leave_type_id, "year"),
+    CONSTRAINT chk_leave_balance_year CHECK ("year" >= 2000 AND "year" <= 2100)
 );
 
 -- Leave Requests
@@ -374,7 +374,7 @@ CREATE INDEX idx_performance_goals_completion_date ON performance_goals(target_c
 -- Leave Management indexes
 CREATE INDEX idx_employee_leave_balances_employee_id ON employee_leave_balances(employee_id);
 CREATE INDEX idx_employee_leave_balances_leave_type ON employee_leave_balances(leave_type_id);
-CREATE INDEX idx_employee_leave_balances_year ON employee_leave_balances(year);
+CREATE INDEX idx_employee_leave_balances_year ON employee_leave_balances("year");
 
 CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
 CREATE INDEX idx_leave_requests_leave_type ON leave_requests(leave_type_id);
@@ -448,7 +448,7 @@ SELECT
     er.employee_number,
     u.first_name || ' ' || u.last_name as employee_name,
     lt.name as leave_type_name,
-    elb.year,
+    elb."year",
     elb.allocated_days,
     elb.used_days,
     elb.pending_days,
@@ -460,7 +460,7 @@ JOIN users u ON er.user_id = u.id
 JOIN leave_types lt ON elb.leave_type_id = lt.id
 WHERE er.employment_status = 'ACTIVE'
   AND lt.status = 'ACTIVE'
-  AND elb.year = EXTRACT(YEAR FROM CURRENT_DATE);
+  AND elb."year" = EXTRACT(YEAR FROM CURRENT_DATE);
 
 -- Performance Review Summary View
 CREATE OR REPLACE VIEW performance_review_summary AS

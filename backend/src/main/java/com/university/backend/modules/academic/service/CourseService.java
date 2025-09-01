@@ -11,6 +11,8 @@ import com.university.backend.modules.academic.repository.CourseRepository;
 import com.university.backend.modules.academic.repository.RegistrationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ public class CourseService {
     private final RegistrationRepository registrationRepository;
     private final DtoMapper dtoMapper;
 
+    @Cacheable("courses")
     @Transactional(readOnly = true)
     public List<CourseDto> getAllCourses() {
         log.info("Fetching all courses");
@@ -45,6 +48,7 @@ public class CourseService {
             .map(dtoMapper::toCourseDto);
     }
 
+    @Cacheable(value = "courses", key = "#id")
     @Transactional(readOnly = true)
     public CourseDto getCourseById(Long id) {
         log.info("Fetching course with id: {}", id);
@@ -88,6 +92,7 @@ public class CourseService {
             .collect(Collectors.toList());
     }
 
+    @CacheEvict(value = "courses", allEntries = true)
     public CourseDto createCourse(CourseRequest request) {
         log.info("Creating new course with code: {}", request.getCode());
         
@@ -127,6 +132,7 @@ public class CourseService {
         return dtoMapper.toCourseDto(savedCourse);
     }
 
+    @CacheEvict(value = "courses", allEntries = true)
     public CourseDto updateCourse(Long id, CourseRequest request) {
         log.info("Updating course with id: {}", id);
         
@@ -182,7 +188,7 @@ public class CourseService {
         // Check if course has active registrations
         Long enrolledCount = registrationRepository.countEnrolledStudentsByCourseId(id);
         if (enrolledCount > 0) {
-            throw new RuntimeException("Cannot delete course with active registrations. Current enrollments: " + enrolledCount);
+            throw new IllegalStateException("Cannot delete course with active registrations. Current enrollments: " + enrolledCount);
         }
 
         courseRepository.delete(course);

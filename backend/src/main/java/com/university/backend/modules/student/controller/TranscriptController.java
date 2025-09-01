@@ -81,15 +81,40 @@ public class TranscriptController {
     @PostMapping("/request")
     @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'ACADEMIC_STAFF')")
     public ResponseEntity<TranscriptRequestDto> requestTranscript(@Valid @RequestBody TranscriptRequestDto requestDto) {
-        User currentUser = securityContextService.getCurrentUserOrThrow();
-        log.info("Processing transcript request for student: {} by user: {}", requestDto.getStudentId(), currentUser.getUsername());
-        
-        // Validate access - students can only request their own transcripts
-        securityContextService.validateStudentResourceAccess(requestDto.getStudentId());
-        
-        // Note: The requesting user context should be handled in the service layer
-        TranscriptRequestDto savedRequest = transcriptService.createTranscriptRequest(requestDto);
-        return new ResponseEntity<>(savedRequest, HttpStatus.CREATED);
+        try {
+            User currentUser = securityContextService.getCurrentUserOrThrow();
+            log.info("Processing transcript request for student: {} by user: {}", requestDto.getStudentId(), currentUser.getUsername());
+            
+            // Validate access - students can only request their own transcripts
+            securityContextService.validateStudentResourceAccess(requestDto.getStudentId());
+            
+            // Validate required fields
+            if (requestDto.getStudentId() == null) {
+                throw new IllegalArgumentException("Student ID is required");
+            }
+            if (requestDto.getTranscriptType() == null) {
+                throw new IllegalArgumentException("Transcript type is required");
+            }
+            if (requestDto.getDeliveryMethod() == null) {
+                throw new IllegalArgumentException("Delivery method is required");
+            }
+            if (requestDto.getRecipientName() == null || requestDto.getRecipientName().trim().isEmpty()) {
+                throw new IllegalArgumentException("Recipient name is required");
+            }
+            if (requestDto.getPurpose() == null || requestDto.getPurpose().trim().isEmpty()) {
+                throw new IllegalArgumentException("Purpose is required");
+            }
+            
+            TranscriptRequestDto savedRequest = transcriptService.createTranscriptRequest(requestDto);
+            log.info("Successfully created transcript request with ID: {}", savedRequest.getId());
+            return new ResponseEntity<>(savedRequest, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error creating transcript request: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error creating transcript request: {}", e.getMessage());
+            throw new RuntimeException("Failed to create transcript request", e);
+        }
     }
     
     /**

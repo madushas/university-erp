@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/student/degree-audits")
@@ -77,14 +78,24 @@ public class DegreeAuditController {
     @GetMapping("/student/{studentId}/latest")
     @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'ACADEMIC_STAFF', 'ADVISOR')")
     public ResponseEntity<DegreeAuditDto> getLatestDegreeAudit(@PathVariable Long studentId) {
-        log.info("Retrieving latest degree audit for student: {}", studentId);
-        
-        // Validate access - students can only view their own degree audits
-        securityContextService.validateStudentResourceAccess(studentId);
-        
-        return degreeAuditService.findLatestByStudentId(studentId)
-                .map(audit -> ResponseEntity.ok().body(audit))
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            log.info("Retrieving latest degree audit for student: {}", studentId);
+            
+            // Validate access - students can only view their own degree audits
+            securityContextService.validateStudentResourceAccess(studentId);
+            
+            Optional<DegreeAuditDto> latestAudit = degreeAuditService.findLatestByStudentId(studentId);
+            if (latestAudit.isPresent()) {
+                log.info("Found latest degree audit for student: {}", studentId);
+                return ResponseEntity.ok(latestAudit.get());
+            } else {
+                log.info("No degree audit found for student: {}", studentId);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            log.error("Error retrieving latest degree audit for student {}: {}", studentId, e.getMessage());
+            throw new RuntimeException("Failed to retrieve latest degree audit", e);
+        }
     }
     
     /**
@@ -148,14 +159,24 @@ public class DegreeAuditController {
     @GetMapping("/student/{studentId}/progress")
     @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'ACADEMIC_STAFF', 'ADVISOR')")
     public ResponseEntity<DegreeAuditDto> getDegreeProgress(@PathVariable Long studentId) {
-        log.info("Retrieving degree progress for student: {}", studentId);
-        
-        // Validate access - students can only view their own degree progress
-        securityContextService.validateStudentResourceAccess(studentId);
-        
-        return degreeAuditService.getDegreeProgress(studentId)
-                .map(progress -> ResponseEntity.ok().body(progress))
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            log.info("Retrieving degree progress for student: {}", studentId);
+            
+            // Validate access - students can only view their own degree progress
+            securityContextService.validateStudentResourceAccess(studentId);
+            
+            Optional<DegreeAuditDto> progress = degreeAuditService.getDegreeProgress(studentId);
+            if (progress.isPresent()) {
+                log.info("Found degree progress for student: {}", studentId);
+                return ResponseEntity.ok(progress.get());
+            } else {
+                log.info("No degree progress found for student: {}", studentId);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            log.error("Error retrieving degree progress for student {}: {}", studentId, e.getMessage());
+            throw new RuntimeException("Failed to retrieve degree progress", e);
+        }
     }
     
     /**
@@ -164,13 +185,19 @@ public class DegreeAuditController {
     @GetMapping("/student/{studentId}/missing-requirements")
     @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'ACADEMIC_STAFF', 'ADVISOR')")
     public ResponseEntity<List<String>> getMissingRequirements(@PathVariable Long studentId) {
-        log.info("Retrieving missing requirements for student: {}", studentId);
-        
-        // Validate access - students can only view their own missing requirements
-        securityContextService.validateStudentResourceAccess(studentId);
-        
-        List<String> missingRequirements = degreeAuditService.getMissingRequirements(studentId);
-        return ResponseEntity.ok(missingRequirements);
+        try {
+            log.info("Retrieving missing requirements for student: {}", studentId);
+            
+            // Validate access - students can only view their own missing requirements
+            securityContextService.validateStudentResourceAccess(studentId);
+            
+            List<String> missingRequirements = degreeAuditService.getMissingRequirements(studentId);
+            log.info("Found {} missing requirements for student: {}", missingRequirements.size(), studentId);
+            return ResponseEntity.ok(missingRequirements);
+        } catch (Exception e) {
+            log.error("Error retrieving missing requirements for student {}: {}", studentId, e.getMessage());
+            throw new RuntimeException("Failed to retrieve missing requirements", e);
+        }
     }
     
     /**

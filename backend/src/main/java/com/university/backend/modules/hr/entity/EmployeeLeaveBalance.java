@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "employee_leave_balances", 
-       uniqueConstraints = @UniqueConstraint(columnNames = {"employee_id", "leave_type_id", "year"}))
+       uniqueConstraints = @UniqueConstraint(columnNames = {"employee_id", "leave_type_id", "`year`"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -34,7 +34,7 @@ public class EmployeeLeaveBalance {
     @NotNull
     private LeaveType leaveType;
 
-    @Column(name = "year", nullable = false)
+    @Column(name = "`year`", nullable = false)
     @Min(2000)
     @Max(2100)
     @NotNull

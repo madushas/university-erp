@@ -10,6 +10,8 @@ import com.university.backend.modules.core.mapper.DtoMapper;
 import com.university.backend.exception.UserNotFoundException;
 import com.university.backend.modules.financial.repository.*;
 import com.university.backend.modules.core.repository.UserRepository;
+import com.university.backend.modules.academic.repository.RegistrationRepository;
+import com.university.backend.dto.request.CreateStudentAccountRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +40,8 @@ public class FinancialService {
     private final StudentAccountRepository studentAccountRepository;
     private final BillingStatementRepository billingStatementRepository;
     private final BillingLineItemRepository billingLineItemRepository;
+    private final RegistrationRepository registrationRepository;
+    private final FeeStructureRepository feeStructureRepository;
     private final DtoMapper dtoMapper;
 
     public StudentAccount getStudentAccountByUsername(@NotBlank(message = "Username is required") String username) {
@@ -171,38 +175,35 @@ public class FinancialService {
      */
     public BillingStatement generateBillingFromRegistrations(Long studentId, List<Long> registrationIds) {
         log.info("Generating billing from registrations for student: {}", studentId);
-        
+
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> new UserNotFoundException("Student not found with ID: " + studentId));
-        
+
         StudentAccount account = studentAccountRepository.findByStudentId(studentId)
                 .orElseGet(() -> createStudentAccount(student));
-        
-        // Calculate total amount from registrations
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        
-        // Create billing statement
+
+        // Create billing statement with initial zero amounts
         BillingStatement statement = BillingStatement.builder()
                 .studentAccount(account)
                 .statementNumber(generateStatementNumber())
                 .billingDate(LocalDate.now())
                 .dueDate(LocalDate.now().plusDays(30))
-                .subtotalAmount(totalAmount)
-                .totalAmount(totalAmount)
-                .balanceAmount(totalAmount)
+                .subtotalAmount(BigDecimal.ZERO)
+                .totalAmount(BigDecimal.ZERO)
+                .balanceAmount(BigDecimal.ZERO)
                 .status(BillingStatus.PENDING)
                 .build();
-        
+
         statement = billingStatementRepository.save(statement);
-        
+
         // Create line items for each registration
         for (Long registrationId : registrationIds) {
             createBillingLineItemForRegistration(statement, registrationId);
         }
-        
-        // Update statement totals
+
+        // Update statement totals after adding all line items
         updateStatementTotals(statement);
-        
+
         log.info("Generated billing statement {} for student {}", statement.getStatementNumber(), studentId);
         return statement;
     }
@@ -211,19 +212,23 @@ public class FinancialService {
      * Create billing line item for a course registration
      */
     private void createBillingLineItemForRegistration(BillingStatement statement, Long registrationId) {
-        // This would typically query the registration to get course fee information
-        // For now, we'll create a basic line item
-        
+        // Query the registration to get course fee information
+        var registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new RuntimeException("Registration not found with ID: " + registrationId));
+
+        var course = registration.getCourse();
+        var courseFee = course.getCourseFee() != null ? course.getCourseFee() : BigDecimal.valueOf(500.00);
+
         BillingLineItem lineItem = BillingLineItem.builder()
                 .billingStatement(statement)
                 .lineNumber(getNextLineNumber(statement.getId()))
-                .description("Course Registration Fee - Registration ID: " + registrationId)
+                .description("Course Fee - " + course.getTitle() + " (" + course.getCode() + ")")
                 .itemType(ItemType.TUITION)
-                .amount(BigDecimal.valueOf(500.00)) // Default course fee
+                .amount(courseFee)
                 .quantity(1)
-                .unitPrice(BigDecimal.valueOf(500.00))
+                .unitPrice(courseFee)
                 .build();
-        
+
         billingLineItemRepository.save(lineItem);
     }
     
@@ -374,5 +379,117 @@ public class FinancialService {
         return statements.stream()
                 .map(dtoMapper::toBillingStatementDto)
                 .collect(Collectors.toList());
+    }
+
+    // Student Account Management Methods
+    public List<StudentAccount> getAllStudentAccounts() {
+        log.info("Fetching all student accounts");
+        return studentAccountRepository.findAll();
+    }
+
+    public StudentAccount createStudentAccount(CreateStudentAccountRequest request) {
+        log.info("Creating student account for student ID: {}", request.getStudentId());
+        
+        User student = userRepository.findById(request.getStudentId())
+                .orElseThrow(() -> new UserNotFoundException("Student not found with ID: " + request.getStudentId()));
+        
+        // Check if account already exists
+        if (studentAccountRepository.findByStudentId(student.getId()).isPresent()) {
+            throw new IllegalStateException("Student account already exists for student ID: " + request.getStudentId());
+        }
+        
+        String accountNumber = request.getAccountNumber() != null ? 
+                request.getAccountNumber() : generateAccountNumber(student);
+        
+        BigDecimal creditLimit = request.getCreditLimit() != null ? 
+                request.getCreditLimit() : BigDecimal.valueOf(1000);
+        
+        AccountStatus status;
+        try {
+            status = AccountStatus.valueOf(request.getAccountStatus().toUpperCase());
+        } catch (Exception e) {
+            status = AccountStatus.ACTIVE;
+        }
+        
+        StudentAccount account = StudentAccount.builder()
+                .student(student)
+                .accountNumber(accountNumber)
+                .currentBalance(BigDecimal.ZERO)
+                .creditLimit(creditLimit)
+                .holdAmount(BigDecimal.ZERO)
+                .accountStatus(status)
+                .build();
+        
+        return studentAccountRepository.save(account);
+    }
+
+    // Fee Structure Management Methods
+    public List<FeeStructure> getAllFeeStructures() {
+        log.info("Fetching all fee structures");
+        return feeStructureRepository.findAll();
+    }
+
+    public FeeStructure createFeeStructure(FeeStructure feeStructure) {
+        log.info("Creating fee structure: {}", feeStructure.getName());
+        
+        // Set default values if not provided
+        if (feeStructure.getStatus() == null) {
+            feeStructure.setStatus(FeeStructureStatus.ACTIVE);
+        }
+        
+        return feeStructureRepository.save(feeStructure);
+    }
+
+    public FeeStructure updateFeeStructure(Long id, FeeStructure feeStructure) {
+        log.info("Updating fee structure with ID: {}", id);
+        
+        FeeStructure existing = feeStructureRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Fee structure not found with ID: " + id));
+        
+        // Update fields
+        existing.setName(feeStructure.getName());
+        existing.setDescription(feeStructure.getDescription());
+        existing.setAcademicYear(feeStructure.getAcademicYear());
+        existing.setProgram(feeStructure.getProgram());
+        existing.setStudentType(feeStructure.getStudentType());
+        existing.setResidencyStatus(feeStructure.getResidencyStatus());
+        existing.setEnrollmentStatus(feeStructure.getEnrollmentStatus());
+        existing.setBaseTuition(feeStructure.getBaseTuition());
+        existing.setTuitionPerCredit(feeStructure.getTuitionPerCredit());
+        existing.setTechnologyFee(feeStructure.getTechnologyFee());
+        existing.setActivityFee(feeStructure.getActivityFee());
+        existing.setLibraryFee(feeStructure.getLibraryFee());
+        existing.setLabFee(feeStructure.getLabFee());
+        existing.setParkingFee(feeStructure.getParkingFee());
+        existing.setHealthFee(feeStructure.getHealthFee());
+        existing.setRecreationFee(feeStructure.getRecreationFee());
+        existing.setStudentUnionFee(feeStructure.getStudentUnionFee());
+        existing.setGraduationFee(feeStructure.getGraduationFee());
+        existing.setApplicationFee(feeStructure.getApplicationFee());
+        existing.setRegistrationFee(feeStructure.getRegistrationFee());
+        existing.setLateRegistrationFee(feeStructure.getLateRegistrationFee());
+        existing.setTranscriptFee(feeStructure.getTranscriptFee());
+        existing.setEffectiveDate(feeStructure.getEffectiveDate());
+        existing.setExpiryDate(feeStructure.getExpiryDate());
+        existing.setStatus(feeStructure.getStatus());
+        
+        return feeStructureRepository.save(existing);
+    }
+
+    public BillingStatement updateBillingStatementStatus(Long id, String status) {
+        log.info("Updating billing statement {} status to: {}", id, status);
+        
+        BillingStatement statement = billingStatementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Billing statement not found with ID: " + id));
+        
+        BillingStatus billingStatus;
+        try {
+            billingStatus = BillingStatus.valueOf(status.toUpperCase());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid billing status: " + status);
+        }
+        
+        statement.setStatus(billingStatus);
+        return billingStatementRepository.save(statement);
     }
 }

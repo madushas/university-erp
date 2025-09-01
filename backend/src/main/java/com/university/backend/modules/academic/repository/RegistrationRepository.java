@@ -95,7 +95,12 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
     Long countByPaymentStatus(PaymentStatus paymentStatus);
     
     // Additional methods needed for business logic
+    Long countByCourseId(Long courseId);
+    
     Long countByCourseIdAndStatus(Long courseId, RegistrationStatus status);
     
     List<Registration> findByUserIdAndStatus(Long userId, RegistrationStatus status);
+    
+    @Query("SELECT COUNT(r) > 0 FROM Registration r WHERE r.user.id = :userId AND r.course.code = :courseCode AND r.grade NOT IN :grades")
+    boolean existsByUserIdAndCourseCodeAndGradeNotIn(@Param("userId") Long userId, @Param("courseCode") String courseCode, @Param("grades") List<String> grades);
 }

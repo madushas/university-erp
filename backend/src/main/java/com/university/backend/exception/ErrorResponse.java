@@ -18,6 +18,8 @@ public class ErrorResponse {
     private String error;
     private String message;
     private String path;
+    private String traceId;
+    private Map<String, Object> details;
 }
 
 @Data

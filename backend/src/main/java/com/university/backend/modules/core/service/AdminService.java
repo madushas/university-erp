@@ -116,6 +116,9 @@ public class AdminService {
         String sanitizedFirstName = inputSanitizer.sanitize(request.getFirstName());
         String sanitizedLastName = inputSanitizer.sanitize(request.getLastName());
         
+        // Additional validation for business rules
+        validateUserBusinessRules(request);
+        
         User user = User.builder()
             .username(request.getUsername())
             .email(request.getEmail())
@@ -625,5 +628,56 @@ public class AdminService {
             case "F" -> 0.0;
             default -> null;
         };
+    }
+
+    /**
+     * Validate business rules for user creation/update
+     */
+    private void validateUserBusinessRules(CreateUserRequest request) {
+        // Validate enrollment and graduation dates
+        if (request.getEnrollmentDate() != null && request.getGraduationDate() != null) {
+            if (request.getGraduationDate().isBefore(request.getEnrollmentDate())) {
+                throw new IllegalArgumentException("Graduation date cannot be before enrollment date");
+            }
+        }
+
+        // Validate expected graduation date
+        if (request.getEnrollmentDate() != null && request.getExpectedGraduationDate() != null) {
+            if (request.getExpectedGraduationDate().isBefore(request.getEnrollmentDate())) {
+                throw new IllegalArgumentException("Expected graduation date cannot be before enrollment date");
+            }
+        }
+
+        // Validate admission date
+        if (request.getAdmissionDate() != null && request.getEnrollmentDate() != null) {
+            if (request.getAdmissionDate().isAfter(request.getEnrollmentDate())) {
+                throw new IllegalArgumentException("Admission date cannot be after enrollment date");
+            }
+        }
+
+        // Validate role-specific requirements
+        if (request.getRole() == Role.STUDENT) {
+            if (request.getStudentId() == null || request.getStudentId().trim().isEmpty()) {
+                throw new IllegalArgumentException("Student ID is required for students");
+            }
+        }
+
+        if (request.getRole() == Role.INSTRUCTOR || request.getRole() == Role.ADMIN) {
+            if (request.getEmployeeId() == null || request.getEmployeeId().trim().isEmpty()) {
+                throw new IllegalArgumentException("Employee ID is required for instructors and admins");
+            }
+        }
+
+        // Validate GPA range if provided
+        if (request.getGpa() != null && (request.getGpa() < 0.0 || request.getGpa() > 4.0)) {
+            throw new IllegalArgumentException("GPA must be between 0.0 and 4.0");
+        }
+
+        // Validate year of study for students
+        if (request.getRole() == Role.STUDENT && request.getYearOfStudy() != null) {
+            if (request.getYearOfStudy() < 1 || request.getYearOfStudy() > 8) {
+                throw new IllegalArgumentException("Year of study must be between 1 and 8");
+            }
+        }
     }
 }

@@ -29,9 +29,33 @@ public class ApplicationController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApplicationDto> createApplication(@Valid @RequestBody ApplicationDto applicationDto) {
-        log.info("Creating new application for applicant: {}", applicationDto.getApplicantEmail());
-        ApplicationDto savedApplication = applicationService.createApplication(applicationDto);
-        return new ResponseEntity<>(savedApplication, HttpStatus.CREATED);
+        try {
+            log.info("Creating new application for applicant: {}", applicationDto.getApplicantEmail());
+            
+            // Validate required fields
+            if (applicationDto.getAcademicProgramId() == null) {
+                throw new IllegalArgumentException("Academic program ID is required");
+            }
+            if (applicationDto.getAcademicYearId() == null) {
+                throw new IllegalArgumentException("Academic year ID is required");
+            }
+            if (applicationDto.getAcademicSemesterId() == null) {
+                throw new IllegalArgumentException("Academic semester ID is required");
+            }
+            if (applicationDto.getApplicationType() == null) {
+                throw new IllegalArgumentException("Application type is required");
+            }
+            
+            ApplicationDto savedApplication = applicationService.createApplication(applicationDto);
+            log.info("Successfully created application with ID: {}", savedApplication.getId());
+            return new ResponseEntity<>(savedApplication, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error creating application: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error creating application: {}", e.getMessage());
+            throw new RuntimeException("Failed to create application", e);
+        }
     }
     
     /**
@@ -148,8 +172,14 @@ public class ApplicationController {
     @GetMapping("/pending-review")
     @PreAuthorize("hasAnyRole('ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<Page<ApplicationDto>> getApplicationsForReview(Pageable pageable) {
-        Page<ApplicationDto> applications = applicationService.findApplicationsForReview(pageable);
-        return ResponseEntity.ok(applications);
+        try {
+            Page<ApplicationDto> applications = applicationService.findApplicationsForReview(pageable);
+            log.info("Retrieved {} applications for review", applications.getTotalElements());
+            return ResponseEntity.ok(applications);
+        } catch (Exception e) {
+            log.error("Error retrieving applications for review: {}", e.getMessage());
+            throw new RuntimeException("Failed to retrieve applications for review", e);
+        }
     }
     
     /**
@@ -180,8 +210,14 @@ public class ApplicationController {
     @GetMapping("/overdue")
     @PreAuthorize("hasAnyRole('ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<List<ApplicationDto>> getOverdueApplications() {
-        List<ApplicationDto> overdueApplications = applicationService.findOverdueApplications();
-        return ResponseEntity.ok(overdueApplications);
+        try {
+            List<ApplicationDto> overdueApplications = applicationService.findOverdueApplications();
+            log.info("Retrieved {} overdue applications", overdueApplications.size());
+            return ResponseEntity.ok(overdueApplications);
+        } catch (Exception e) {
+            log.error("Error retrieving overdue applications: {}", e.getMessage());
+            throw new RuntimeException("Failed to retrieve overdue applications", e);
+        }
     }
     
     /**

@@ -78,4 +78,17 @@ public class CourseRequest {
     private String textbook;
     
     private String passingGrade;
+    
+    // Manual getter methods for compatibility
+    public Integer getCredits() {
+        return this.credits;
+    }
+    
+    public LocalDate getStartDate() {
+        return this.startDate;
+    }
+    
+    public LocalDate getEndDate() {
+        return this.endDate;
+    }
 }

@@ -1,6 +1,5 @@
 package com.university.backend.modules.academic.entity;
 
-import com.university.backend.modules.core.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

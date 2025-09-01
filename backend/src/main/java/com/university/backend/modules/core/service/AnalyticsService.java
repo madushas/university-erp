@@ -27,7 +27,6 @@ public class AnalyticsService {
     private final CourseRepository courseRepository;
     private final RegistrationRepository registrationRepository;
     private final DepartmentRepository departmentRepository;
-    private final AcademicSemesterRepository academicSemesterRepository;
 
     public Map<String, Object> getDashboardAnalytics() {
         log.info("Generating dashboard analytics");

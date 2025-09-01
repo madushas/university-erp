@@ -4,6 +4,8 @@ import com.university.backend.modules.academic.entity.Registration;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.PastOrPresent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,11 +35,11 @@ public class User {
     private Long id;
 
     @Column(unique = true, nullable = false)
-    @Size(min = 3, max = 50)
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String username;
 
     @Column(nullable = false)
-    @Email
+    @Email(message = "Email should be valid")
     private String email;
 
     @Column(nullable = false)
@@ -60,6 +62,7 @@ public class User {
     private String phoneNumber;
 
     @Column(name = "date_of_birth")
+    @Past(message = "Date of birth must be in the past")
     private LocalDate dateOfBirth;
 
     @Column(name = "address")
@@ -109,6 +112,7 @@ public class User {
     private UserStatus status = UserStatus.ACTIVE;
 
     @Column(name = "enrollment_date")
+    @PastOrPresent(message = "Enrollment date cannot be in the future")
     private LocalDate enrollmentDate;
 
     @Column(name = "graduation_date")
@@ -166,4 +170,46 @@ public class User {
     @Builder.Default
     @JsonIgnore
     private List<Registration> registrations = new ArrayList<>();
+
+    /**
+     * Validate business rules for user entity
+     */
+    @PrePersist
+    @PreUpdate
+    private void validateBusinessRules() {
+        // Validate graduation date is after enrollment date
+        if (enrollmentDate != null && graduationDate != null) {
+            if (graduationDate.isBefore(enrollmentDate)) {
+                throw new IllegalArgumentException("Graduation date cannot be before enrollment date");
+            }
+        }
+
+        // Validate expected graduation date is after enrollment date
+        if (enrollmentDate != null && expectedGraduationDate != null) {
+            if (expectedGraduationDate.isBefore(enrollmentDate)) {
+                throw new IllegalArgumentException("Expected graduation date cannot be before enrollment date");
+            }
+        }
+
+        // Validate admission date is before or equal to enrollment date
+        if (admissionDate != null && enrollmentDate != null) {
+            if (admissionDate.isAfter(enrollmentDate)) {
+                throw new IllegalArgumentException("Admission date cannot be after enrollment date");
+            }
+        }
+
+        // Validate student-specific fields
+        if (role == Role.STUDENT) {
+            if (studentId == null || studentId.trim().isEmpty()) {
+                throw new IllegalArgumentException("Student ID is required for students");
+            }
+        }
+
+        // Validate employee-specific fields
+        if (role == Role.INSTRUCTOR || role == Role.ADMIN) {
+            if (employeeId == null || employeeId.trim().isEmpty()) {
+                throw new IllegalArgumentException("Employee ID is required for instructors and admins");
+            }
+        }
+    }
 }

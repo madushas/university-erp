@@ -2,7 +2,6 @@ package com.university.backend.modules.student.controller;
 
 import com.university.backend.modules.student.dto.StudentAcademicRecordDto;
 import com.university.backend.modules.student.service.StudentAcademicRecordService;
-import com.university.backend.modules.core.entity.User;
 import com.university.backend.security.SecurityContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +16,7 @@ import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/student/academic-records")
@@ -138,10 +138,16 @@ public class StudentAcademicRecordController {
     @GetMapping("/eligible-for-graduation")
     @PreAuthorize("hasAnyRole('ADMIN', 'ACADEMIC_STAFF', 'REGISTRAR')")
     public ResponseEntity<List<StudentAcademicRecordDto>> getStudentsEligibleForGraduation() {
-        log.info("Retrieving students eligible for graduation");
-        
-        // TODO: Implement graduation eligibility retrieval
-        return ResponseEntity.ok(List.of());
+        try {
+            log.info("Retrieving students eligible for graduation");
+            
+            List<StudentAcademicRecordDto> eligibleStudents = studentAcademicRecordService.findEligibleForGraduation();
+            log.info("Found {} students eligible for graduation", eligibleStudents.size());
+            return ResponseEntity.ok(eligibleStudents);
+        } catch (Exception e) {
+            log.error("Error retrieving students eligible for graduation: {}", e.getMessage());
+            throw new RuntimeException("Failed to retrieve students eligible for graduation", e);
+        }
     }
     
     /**
@@ -153,10 +159,29 @@ public class StudentAcademicRecordController {
             @PathVariable Long id,
             @RequestParam BigDecimal newGpa,
             @RequestParam Integer newCredits) {
-        log.info("Updating academic progress for record: {}", id);
-        
-        // TODO: Implement academic progress update
-        return ResponseEntity.ok().build();
+        try {
+            log.info("Updating academic progress for record: {}", id);
+            
+            // Validate GPA range (0.0-4.0)
+            if (newGpa.compareTo(BigDecimal.ZERO) < 0 || newGpa.compareTo(new BigDecimal("4.0")) > 0) {
+                throw new IllegalArgumentException("GPA must be between 0.0 and 4.0");
+            }
+            
+            // Validate credit hours (non-negative)
+            if (newCredits < 0) {
+                throw new IllegalArgumentException("Credit hours cannot be negative");
+            }
+            
+            StudentAcademicRecordDto updatedRecord = studentAcademicRecordService.updateAcademicProgress(id, newGpa, newCredits);
+            log.info("Successfully updated academic progress for record: {}", id);
+            return ResponseEntity.ok(updatedRecord);
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error updating academic progress: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error updating academic progress for record {}: {}", id, e.getMessage());
+            throw new RuntimeException("Failed to update academic progress", e);
+        }
     }
     
     /**
@@ -167,10 +192,27 @@ public class StudentAcademicRecordController {
     public ResponseEntity<StudentAcademicRecordDto> markAsGraduated(
             @PathVariable Long id,
             @RequestParam LocalDate graduationDate) {
-        log.info("Marking student as graduated: {}", id);
-        
-        // TODO: Implement graduation marking
-        return ResponseEntity.ok().build();
+        try {
+            log.info("Marking student as graduated: {}", id);
+            
+            // Validate graduation date
+            if (graduationDate == null) {
+                throw new IllegalArgumentException("Graduation date is required");
+            }
+            if (graduationDate.isAfter(LocalDate.now())) {
+                throw new IllegalArgumentException("Graduation date cannot be in the future");
+            }
+            
+            StudentAcademicRecordDto graduatedRecord = studentAcademicRecordService.markAsGraduated(id, graduationDate);
+            log.info("Successfully marked student as graduated: {}", id);
+            return ResponseEntity.ok(graduatedRecord);
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error marking student as graduated: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error marking student as graduated {}: {}", id, e.getMessage());
+            throw new RuntimeException("Failed to mark student as graduated", e);
+        }
     }
     
     /**
@@ -178,13 +220,21 @@ public class StudentAcademicRecordController {
      */
     @GetMapping("/statistics/program/{programId}/year/{academicYearId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'ACADEMIC_STAFF')")
-    public ResponseEntity<?> getAcademicStatistics(
+    public ResponseEntity<StudentAcademicRecordService.AcademicStatistics> getAcademicStatistics(
             @PathVariable Long programId,
             @PathVariable Long academicYearId) {
-        log.info("Retrieving academic statistics for program: {} and year: {}", programId, academicYearId);
-        
-        // TODO: Implement academic statistics retrieval
-        return ResponseEntity.ok().build();
+        try {
+            log.info("Retrieving academic statistics for program: {} and year: {}", programId, academicYearId);
+            
+            StudentAcademicRecordService.AcademicStatistics statistics = 
+                studentAcademicRecordService.getAcademicStatistics(programId, academicYearId);
+            log.info("Retrieved academic statistics for program: {} and year: {}", programId, academicYearId);
+            return ResponseEntity.ok(statistics);
+        } catch (Exception e) {
+            log.error("Error retrieving academic statistics for program {} and year {}: {}", 
+                programId, academicYearId, e.getMessage());
+            throw new RuntimeException("Failed to retrieve academic statistics", e);
+        }
     }
     
     /**
@@ -192,14 +242,20 @@ public class StudentAcademicRecordController {
      */
     @GetMapping("/student/{studentId}/gpa-history")
     @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'ACADEMIC_STAFF')")
-    public ResponseEntity<List<Object>> getGpaHistory(@PathVariable Long studentId) {
-        log.info("Retrieving GPA history for student: {}", studentId);
-        
-        // Validate access - students can only view their own records
-        securityContextService.validateStudentResourceAccess(studentId);
-        
-        // TODO: Implement GPA history retrieval
-        return ResponseEntity.ok(List.of());
+    public ResponseEntity<List<StudentAcademicRecordDto>> getGpaHistory(@PathVariable Long studentId) {
+        try {
+            log.info("Retrieving GPA history for student: {}", studentId);
+            
+            // Validate access - students can only view their own records
+            securityContextService.validateStudentResourceAccess(studentId);
+            
+            List<StudentAcademicRecordDto> gpaHistory = studentAcademicRecordService.findByStudentId(studentId);
+            log.info("Retrieved {} GPA history records for student: {}", gpaHistory.size(), studentId);
+            return ResponseEntity.ok(gpaHistory);
+        } catch (Exception e) {
+            log.error("Error retrieving GPA history for student {}: {}", studentId, e.getMessage());
+            throw new RuntimeException("Failed to retrieve GPA history", e);
+        }
     }
     
     /**
@@ -207,13 +263,24 @@ public class StudentAcademicRecordController {
      */
     @GetMapping("/student/{studentId}/degree-progress")
     @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'ACADEMIC_STAFF')")
-    public ResponseEntity<Object> getDegreeProgress(@PathVariable Long studentId) {
-        log.info("Retrieving degree progress for student: {}", studentId);
-        
-        // Validate access - students can only view their own records
-        securityContextService.validateStudentResourceAccess(studentId);
-        
-        // TODO: Implement degree progress retrieval
-        return ResponseEntity.ok().build();
+    public ResponseEntity<StudentAcademicRecordDto> getDegreeProgress(@PathVariable Long studentId) {
+        try {
+            log.info("Retrieving degree progress for student: {}", studentId);
+            
+            // Validate access - students can only view their own records
+            securityContextService.validateStudentResourceAccess(studentId);
+            
+            Optional<StudentAcademicRecordDto> currentRecord = studentAcademicRecordService.findCurrentRecordByStudentId(studentId);
+            if (currentRecord.isPresent()) {
+                log.info("Retrieved degree progress for student: {}", studentId);
+                return ResponseEntity.ok(currentRecord.get());
+            } else {
+                log.info("No degree progress found for student: {}", studentId);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            log.error("Error retrieving degree progress for student {}: {}", studentId, e.getMessage());
+            throw new RuntimeException("Failed to retrieve degree progress", e);
+        }
     }
 }

@@ -7,8 +7,6 @@ import com.university.backend.modules.core.entity.User;
 import com.university.backend.exception.*;
 import com.university.backend.modules.academic.repository.*;
 import com.university.backend.modules.core.repository.UserRepository;
-import com.university.backend.modules.student.entity.StudentAcademicRecord;
-import com.university.backend.modules.student.repository.StudentAcademicRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalTime;
-import java.util.Arrays;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,8 +27,6 @@ public class RegistrationService {
     private final RegistrationRepository registrationRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
-    private final CoursePrerequisiteRepository coursePrerequisiteRepository;
-    private final StudentAcademicRecordRepository studentAcademicRecordRepository;
     private final DtoMapper dtoMapper;
 
     @Transactional(readOnly = true)
@@ -250,18 +244,112 @@ public class RegistrationService {
     private void validateEnrollmentEligibility(User user, Course course) {
         // Basic validation - check if already enrolled
         if (registrationRepository.existsByUserIdAndCourseId(user.getId(), course.getId())) {
-            throw new RuntimeException("Student is already enrolled in this course");
+            throw new DuplicateRegistrationException("Student is already enrolled in this course");
         }
 
         // Check course capacity
         if (course.getMaxStudents() != null) {
             long currentEnrollment = registrationRepository.countByCourseIdAndStatus(course.getId(), RegistrationStatus.ENROLLED);
             if (currentEnrollment >= course.getMaxStudents()) {
-                throw new RuntimeException("Course has reached maximum capacity (" + course.getMaxStudents() + " students)");
+                throw new CourseFullException("Course has reached maximum capacity (" + course.getMaxStudents() + " students)");
             }
         }
 
-        // Additional validations can be added here as the entity structure allows
+        // Check course status
+        if (course.getStatus() != CourseStatus.ACTIVE && course.getStatus() != CourseStatus.PUBLISHED) {
+            throw new CourseNotAvailableException("Course is not available for enrollment. Current status: " + course.getStatus());
+        }
+
+        // Validate prerequisites
+        validatePrerequisites(user, course);
+
+        // Check for schedule conflicts
+        validateScheduleConflict(user.getId(), course);
+    }
+
+    /**
+     * Validate that user has completed all prerequisite courses
+     */
+    private void validatePrerequisites(User user, Course course) {
+        if (course.getPrerequisites() == null || course.getPrerequisites().trim().isEmpty()) {
+            return; // No prerequisites required
+        }
+
+        String[] prereqCodes = course.getPrerequisites().split(",");
+        for (String prereqCode : prereqCodes) {
+            String trimmedCode = prereqCode.trim();
+            if (!trimmedCode.isEmpty()) {
+                // Check if user has completed this prerequisite course
+                boolean hasCompleted = registrationRepository.findByUserId(user.getId())
+                    .stream()
+                    .anyMatch(reg -> reg.getCourse().getCode().equals(trimmedCode) 
+                                  && reg.getStatus() == RegistrationStatus.COMPLETED
+                                  && reg.getGrade() != null 
+                                  && !reg.getGrade().equals("F")
+                                  && !reg.getGrade().equals("FAIL"));
+
+                if (!hasCompleted) {
+                    throw new PrerequisiteNotMetException("Prerequisites not met. Required course: " + trimmedCode);
+                }
+            }
+        }
+    }
+
+    /**
+     * Validate that the course schedule doesn't conflict with existing enrollments
+     */
+    private void validateScheduleConflict(Long userId, Course newCourse) {
+        if (newCourse.getDaysOfWeek() == null || newCourse.getStartTime() == null || newCourse.getEndTime() == null) {
+            return; // Cannot validate without schedule information
+        }
+
+        List<Registration> activeRegistrations = registrationRepository.findByUserIdAndStatus(userId, RegistrationStatus.ENROLLED);
+        
+        for (Registration registration : activeRegistrations) {
+            Course existingCourse = registration.getCourse();
+            
+            // Skip if existing course doesn't have schedule info
+            if (existingCourse.getDaysOfWeek() == null || existingCourse.getStartTime() == null || existingCourse.getEndTime() == null) {
+                continue;
+            }
+
+            // Check for day overlap
+            if (hasCommonDays(newCourse.getDaysOfWeek(), existingCourse.getDaysOfWeek())) {
+                // Check for time overlap
+                if (hasTimeOverlap(newCourse.getStartTime(), newCourse.getEndTime(), 
+                                 existingCourse.getStartTime(), existingCourse.getEndTime())) {
+                    throw new ScheduleConflictException("Schedule conflict with course: " + existingCourse.getCode() 
+                                             + " (" + existingCourse.getTitle() + ")");
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if two course schedules have common days
+     */
+    private boolean hasCommonDays(String days1, String days2) {
+        if (days1 == null || days2 == null) return false;
+        
+        String[] days1Array = days1.split(",");
+        String[] days2Array = days2.split(",");
+        
+        for (String day1 : days1Array) {
+            for (String day2 : days2Array) {
+                if (day1.trim().equalsIgnoreCase(day2.trim())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if two time ranges overlap
+     */
+    private boolean hasTimeOverlap(java.time.LocalTime start1, java.time.LocalTime end1, 
+                                  java.time.LocalTime start2, java.time.LocalTime end2) {
+        return start1.isBefore(end2) && start2.isBefore(end1);
     }
 
     /**

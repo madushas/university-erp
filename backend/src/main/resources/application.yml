@@ -8,18 +8,55 @@ spring:
     password: ${DATABASE_PASSWORD:12345}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 20000
-      idle-timeout: 300000
-      max-lifetime: 900000
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
       validation-timeout: 5000
       leak-detection-threshold: 60000
+      pool-name: UniversityHikariCP
+      auto-commit: false
+      connection-test-query: SELECT 1
   
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        query:
+          plan_cache_max_size: 2048
+          plan_parameter_metadata_max_size: 128
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+  
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=300s
+    cache-names:
+      - courses
+      - users
+      - student-records
+      - applications
+      - degree-audits
+      - transcripts
+      - financial-accounts
+      - billing-statements
+      - leave-types
+      - leave-requests
   
   flyway:
     enabled: true
@@ -35,22 +72,51 @@ server:
       worker: ${UNDERTOW_WORKER_THREADS:64}
     buffer-size: ${UNDERTOW_BUFFER_SIZE:1024}
     direct-buffers: ${UNDERTOW_DIRECT_BUFFERS:true}
+  connection-timeout: 30000
+  servlet:
+    session:
+      timeout: 30m
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,env,configprops,loggers,threaddump,heapdump
   endpoint:
     health:
       show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+# OpenAPI/Swagger Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+    disable-swagger-default-url: true
+    doc-expansion: none
+  show-actuator: true
 
 logging:
   level:
     '[com.university.backend]': ${LOG_LEVEL:INFO}
-    '[org.springframework.security]': ${SECURITY_LOG_LEVEL:INFO}
+    '[com.university.backend.interceptor]': DEBUG
+    '[com.university.backend.service.PerformanceMonitoringService]': INFO
+    '[org.springframework.security]': ${SECURITY_LOG_LEVEL:WARN}
+    '[org.hibernate.SQL]': DEBUG
+    '[org.hibernate.type.descriptor.sql.BasicBinder]': TRACE
+    '[org.springframework.web.servlet.DispatcherServlet]': DEBUG
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{requestId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{requestId:-}] %logger{36} - %msg%n"
+  file:
+    name: logs/university-backend.log
+    max-size: 100MB
+    max-history: 30
 
 app:
   jwt:
@@ -59,11 +125,10 @@ app:
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
-
-# API Documentation
-springdoc:
-  api-docs:
-    path: swagger-ui/v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    operationsSorter: method
+  timeout:
+    request: ${REQUEST_TIMEOUT:30000} # 30 seconds
+    database: ${DATABASE_TIMEOUT:5000} # 5 seconds
+    circuit-breaker:
+      failure-threshold: ${CIRCUIT_BREAKER_FAILURE_THRESHOLD:5}
+      timeout: ${CIRCUIT_BREAKER_TIMEOUT:10000} # 10 seconds
+      reset-timeout: ${CIRCUIT_BREAKER_RESET_TIMEOUT:60000} # 60 seconds

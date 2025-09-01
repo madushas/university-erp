@@ -4,7 +4,9 @@ import com.university.backend.modules.core.entity.User;
 import com.university.backend.modules.academic.entity.Course;
 import com.university.backend.modules.academic.entity.Registration;
 import com.university.backend.modules.academic.entity.Department;
+import com.university.backend.modules.academic.entity.RegistrationStatus;
 import com.university.backend.modules.core.dto.UserDto;
+import com.university.backend.dto.response.UserResponse;
 import com.university.backend.modules.academic.dto.CourseDto;
 import com.university.backend.modules.academic.dto.RegistrationDto;
 import com.university.backend.modules.academic.dto.DepartmentDto;
@@ -95,7 +97,7 @@ public class DtoMapper {
                 .syllabusUrl(course.getSyllabusUrl())
                 .textbook(course.getTextbook())
                 .passingGrade(course.getPassingGrade())
-                .enrolledStudents(course.getRegistrations() != null ? course.getRegistrations().size() : 0)
+                .enrolledStudents(calculateEnrolledStudents(course))
                 .createdAt(course.getCreatedAt())
                 .updatedAt(course.getUpdatedAt())
                 .build();
@@ -213,5 +215,47 @@ public class DtoMapper {
 
     public List<BillingStatementDto> toBillingStatementDtoList(List<BillingStatement> statements) {
         return statements != null ? statements.stream().map(this::toBillingStatementDto).collect(Collectors.toList()) : null;
+    }
+
+    // Helper method to calculate enrolled students count
+    private Integer calculateEnrolledStudents(Course course) {
+        if (course.getRegistrations() == null) {
+            return 0;
+        }
+        
+        return (int) course.getRegistrations().stream()
+                .filter(registration -> registration.getStatus() == RegistrationStatus.ENROLLED)
+                .count();
+    }
+
+    // User to UserResponse mapping
+    public UserResponse toUserResponse(User user) {
+        if (user == null) return null;
+        
+        return UserResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .role(user.getRole())
+                .employeeId(user.getEmployeeId())
+                .studentId(user.getStudentId())
+                .phoneNumber(user.getPhoneNumber())
+                .dateOfBirth(user.getDateOfBirth())
+                .address(user.getAddress())
+                .city(user.getCity())
+                .state(user.getState())
+                .postalCode(user.getPostalCode())
+                .country(user.getCountry())
+                .department(user.getDepartment())
+                .yearOfStudy(user.getYearOfStudy())
+                .gpa(user.getGpa())
+                .status(user.getStatus())
+                .enrollmentDate(user.getEnrollmentDate())
+                .graduationDate(user.getGraduationDate())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
     }
 }

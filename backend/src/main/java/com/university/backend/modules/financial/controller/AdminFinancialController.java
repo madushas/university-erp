@@ -6,6 +6,7 @@ import com.university.backend.dto.response.BillingStatementResponse;
 import com.university.backend.modules.financial.entity.BillingLineItem;
 import com.university.backend.modules.financial.entity.BillingStatement;
 import com.university.backend.modules.financial.entity.StudentAccount;
+import com.university.backend.modules.financial.entity.FeeStructure;
 import com.university.backend.modules.financial.service.FinancialService;
 
 import lombok.RequiredArgsConstructor;
@@ -36,9 +37,14 @@ public class AdminFinancialController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication) {
-        log.info("Admin {} fetching all student accounts", authentication.getName());
-        // For now, return empty list - implement when StudentAccount service is ready
-        return ResponseEntity.ok(java.util.Collections.emptyList());
+        try {
+            log.info("Admin {} fetching all student accounts", authentication.getName());
+            List<StudentAccount> accounts = financialService.getAllStudentAccounts();
+            return ResponseEntity.ok(accounts);
+        } catch (Exception e) {
+            log.error("Error fetching student accounts", e);
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
 
     @GetMapping("/accounts/{id}")
@@ -56,9 +62,25 @@ public class AdminFinancialController {
     public ResponseEntity<StudentAccount> createStudentAccount(
             @RequestBody com.university.backend.dto.request.CreateStudentAccountRequest request,
             Authentication authentication) {
-        log.info("Admin {} creating student account", authentication.getName());
-        // For now, return 501 - implement when StudentAccount service is ready
-        return ResponseEntity.status(501).build();
+        try {
+            log.info("Admin {} creating student account", authentication.getName());
+            
+            // Validate required fields
+            if (request.getStudentId() == null) {
+                throw new IllegalArgumentException("Student ID is required");
+            }
+            if (request.getAccountStatus() == null || request.getAccountStatus().trim().isEmpty()) {
+                throw new IllegalArgumentException("Account status is required");
+            }
+            
+            StudentAccount account = financialService.createStudentAccount(request);
+            return ResponseEntity.ok(account);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error creating student account", e);
+            throw new RuntimeException("Failed to create student account", e);
+        }
     }
 
     @PatchMapping("/accounts/{id}/status")
@@ -75,10 +97,15 @@ public class AdminFinancialController {
     // Fee Structure Management
     @GetMapping("/fee-structures")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<Object>> getAllFeeStructures(Authentication authentication) {
-        log.info("Admin {} fetching all fee structures", authentication.getName());
-        // For now, return empty list - implement when FeeStructure service is ready
-        return ResponseEntity.ok(java.util.Collections.emptyList());
+    public ResponseEntity<List<FeeStructure>> getAllFeeStructures(Authentication authentication) {
+        try {
+            log.info("Admin {} fetching all fee structures", authentication.getName());
+            List<FeeStructure> feeStructures = financialService.getAllFeeStructures();
+            return ResponseEntity.ok(feeStructures);
+        } catch (Exception e) {
+            log.error("Error fetching fee structures", e);
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
 
     @GetMapping("/fee-structures/{id}")
@@ -93,12 +120,28 @@ public class AdminFinancialController {
 
     @PostMapping("/fee-structures")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Object> createFeeStructure(
-            @RequestBody Object request,
+    public ResponseEntity<FeeStructure> createFeeStructure(
+            @RequestBody FeeStructure request,
             Authentication authentication) {
-        log.info("Admin {} creating fee structure", authentication.getName());
-        // For now, return 501 - implement when FeeStructure service is ready
-        return ResponseEntity.status(501).build();
+        try {
+            log.info("Admin {} creating fee structure", authentication.getName());
+            
+            // Validate required fields
+            if (request.getName() == null || request.getName().trim().isEmpty()) {
+                throw new IllegalArgumentException("Fee structure name is required");
+            }
+            if (request.getEffectiveDate() == null) {
+                throw new IllegalArgumentException("Effective date is required");
+            }
+            
+            FeeStructure feeStructure = financialService.createFeeStructure(request);
+            return ResponseEntity.ok(feeStructure);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error creating fee structure", e);
+            throw new RuntimeException("Failed to create fee structure", e);
+        }
     }
 
     @PutMapping("/fee-structures/{id}")

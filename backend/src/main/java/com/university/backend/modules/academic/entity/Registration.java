@@ -16,7 +16,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "registrations")
+@Table(name = "registrations", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user_id", "course_id"})
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -99,10 +101,4 @@ public class Registration {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    // Unique constraint to prevent duplicate registrations
-    @Table(uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "course_id"})
-    })
-    public static class RegistrationConstraints {}
 }

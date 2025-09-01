@@ -1,6 +1,5 @@
 package com.university.backend.modules.core.service;
 
-import com.university.backend.modules.academic.entity.Registration;
 import com.university.backend.modules.academic.entity.RegistrationStatus;
 import com.university.backend.modules.academic.service.RegistrationService;
 import com.university.backend.modules.financial.entity.BillingStatement;
@@ -42,17 +41,17 @@ public class AcademicBusinessLogicService {
         try {
             // 1. Enroll student in course (includes all validation)
             var registration = registrationService.enrollUserInCourse(studentId, courseId);
-            
-            // 2. Generate billing for the registration
-            registrationService.generateRegistrationBilling(registration.getId());
-            
+
+            // 2. Generate comprehensive billing for the registration
+            generateRegistrationBillingStatement(studentId, List.of(registration.getId()));
+
             // 3. Update student's academic record if needed
             updateStudentAcademicProgress(studentId);
-            
+
             log.info("Successfully completed enrollment for student {} in course {}", studentId, courseId);
-            
+
         } catch (Exception e) {
-            log.error("Failed to complete enrollment for student {} in course {}: {}", 
+            log.error("Failed to complete enrollment for student {} in course {}: {}",
                      studentId, courseId, e.getMessage());
             throw new RuntimeException("Enrollment failed: " + e.getMessage(), e);
         }
@@ -110,6 +109,27 @@ public class AcademicBusinessLogicService {
         } catch (Exception e) {
             log.error("Failed to generate semester billing for student {}: {}", studentId, e.getMessage());
             throw new RuntimeException("Billing generation failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Generate billing statement for course registrations
+     */
+    public BillingStatement generateRegistrationBillingStatement(Long studentId, List<Long> registrationIds) {
+        log.info("Generating billing statement for student {} with {} registrations", studentId, registrationIds.size());
+
+        try {
+            // Generate billing statement from registrations
+            BillingStatement statement = financialService.generateBillingFromRegistrations(studentId, registrationIds);
+
+            log.info("Generated billing statement {} for student {} with {} registrations",
+                    statement.getStatementNumber(), studentId, registrationIds.size());
+
+            return statement;
+
+        } catch (Exception e) {
+            log.error("Failed to generate billing statement for student {}: {}", studentId, e.getMessage());
+            throw new RuntimeException("Billing statement generation failed: " + e.getMessage(), e);
         }
     }
 
@@ -222,12 +242,22 @@ public class AcademicBusinessLogicService {
 
         int successCount = 0;
         int failureCount = 0;
+        List<Long> successfulRegistrationIds = new java.util.ArrayList<>();
 
         for (Long courseId : courseIds) {
             try {
                 completeStudentEnrollment(studentId, courseId);
+                // Get the registration ID for billing generation
+                var registration = registrationService.getUserRegistrations(studentId)
+                    .stream()
+                    .filter(r -> r.getCourse().getId().equals(courseId))
+                    .findFirst()
+                    .orElse(null);
+                if (registration != null) {
+                    successfulRegistrationIds.add(registration.getId());
+                }
                 successCount++;
-                
+
             } catch (Exception e) {
                 log.error("Failed to enroll student {} in course {}: {}", studentId, courseId, e.getMessage());
                 failureCount++;
@@ -235,16 +265,15 @@ public class AcademicBusinessLogicService {
         }
 
         // Generate semester billing after all enrollments
-        if (successCount > 0) {
+        if (successCount > 0 && !successfulRegistrationIds.isEmpty()) {
             try {
-                // Assuming current semester ID is 1 for simplicity
-                generateSemesterBilling(studentId, 1L);
+                generateRegistrationBillingStatement(studentId, successfulRegistrationIds);
             } catch (Exception e) {
                 log.error("Failed to generate semester billing for student {}: {}", studentId, e.getMessage());
             }
         }
 
-        log.info("Semester enrollment completed for student {}: {} successful, {} failed", 
+        log.info("Semester enrollment completed for student {}: {} successful, {} failed",
                 studentId, successCount, failureCount);
     }
 }
