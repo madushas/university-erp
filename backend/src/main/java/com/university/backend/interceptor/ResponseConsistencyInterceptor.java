@@ -3,6 +3,9 @@ package com.university.backend.interceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -14,8 +17,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class ResponseConsistencyInterceptor implements HandlerInterceptor {
 
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, 
-                               Object handler, Exception ex) {
+    public void afterCompletion(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, 
+                               @NonNull Object handler, @Nullable Exception ex) {
         String method = request.getMethod();
         String uri = request.getRequestURI();
         int status = response.getStatus();

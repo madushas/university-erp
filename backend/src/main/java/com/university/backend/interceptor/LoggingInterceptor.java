@@ -3,6 +3,8 @@ package com.university.backend.interceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.util.ContentCachingRequestWrapper;
@@ -30,9 +32,8 @@ public class LoggingInterceptor implements HandlerInterceptor {
     private static final String[] SENSITIVE_HEADERS = {
         "authorization", "cookie", "set-cookie", "x-auth-token", "x-api-key"
     };
-
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) {
         // Generate or extract request ID
         String requestId = request.getHeader(REQUEST_ID_HEADER);
         if (requestId == null || requestId.trim().isEmpty()) {
@@ -51,10 +52,9 @@ public class LoggingInterceptor implements HandlerInterceptor {
         
         return true;
     }
-
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, 
-                              Object handler, Exception ex) {
+    public void afterCompletion(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+                              @NonNull Object handler, @Nullable Exception ex) {
         String requestId = (String) request.getAttribute(REQUEST_ID_ATTR);
         Long startTime = (Long) request.getAttribute(REQUEST_START_TIME);
         

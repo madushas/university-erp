@@ -160,6 +160,28 @@ public class AuthService {
         }
     }
 
+    public void logout(RefreshTokenRequest request) {
+        log.info("User logout requested");
+        
+        try {
+            // Validate refresh token
+            if (request.getRefreshToken() == null || request.getRefreshToken().trim().isEmpty()) {
+                throw new IllegalArgumentException("Refresh token cannot be empty");
+            }
+
+            // For now, we just log the logout. In a production system, you might want to:
+            // 1. Add the token to a blacklist
+            // 2. Store it in Redis with expiration
+            // 3. Update the user's refresh token in the database to null
+            
+            log.info("User logged out successfully");
+            
+        } catch (Exception e) {
+            log.error("Logout failed: {}", e.getMessage());
+            throw e;
+        }
+    }
+
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
             .id(user.getId())

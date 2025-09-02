@@ -6,6 +6,7 @@ import org.hibernate.type.Type;
 import org.springframework.stereotype.Component;
 
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -50,7 +51,7 @@ public class DatabaseQueryInterceptor implements Interceptor {
     }
 
     @Override
-    public void postFlush(java.util.Iterator entities) {
+    public void postFlush(Iterator<Object> entities) {
         recordQueryEnd("FLUSH_OPERATION");
     }
 
