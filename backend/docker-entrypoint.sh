@@ -21,6 +21,9 @@ DB_USER=$(read_secret DATABASE_USERNAME)
 DB_PASS=$(read_secret DATABASE_PASSWORD)
 JWT_SECRET=$(read_secret JWT_SECRET)
 
+# Optional runtime config (can be empty)
+CORS_ALLOWED_ORIGINS=$(read_secret CORS_ALLOWED_ORIGINS)
+
 # Validate presence of required secrets. Note the spaces in the test are required.
 if [ -z "$DB_USER" ] || [ -z "$DB_PASS" ] || [ -z "$JWT_SECRET" ] || [ -z "$DB_URL" ]; then
   echo "ERROR: Required secrets not provided. Provide DATABASE_URL, DATABASE_USERNAME, DATABASE_PASSWORD and JWT_SECRET via Docker secrets (preferred) or environment variables." >&2
@@ -33,6 +36,11 @@ export DATABASE_URL="$DB_URL"
 export DATABASE_USERNAME="$DB_USER"
 export DATABASE_PASSWORD="$DB_PASS"
 export JWT_SECRET="$JWT_SECRET"
+
+# Export optional CORS setting if provided, otherwise leave existing env or default
+if [ -n "$CORS_ALLOWED_ORIGINS" ]; then
+  export CORS_ALLOWED_ORIGINS="$CORS_ALLOWED_ORIGINS"
+fi
 
 # Allow passing additional java args or override the jar
 if [ "$#" -gt 0 ]; then
