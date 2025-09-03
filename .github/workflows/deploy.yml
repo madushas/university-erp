@@ -157,6 +157,18 @@ jobs:
               WEBSITES_PORT=3000 \
               NEXT_PUBLIC_API_URL=https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net
 
+      - name: Configure frontend application settings (secrets from GitHub)
+        run: |
+          az webapp config appsettings set \
+            --name ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --settings \
+              NEXT_PUBLIC_API_URL="${{ secrets.FRONTEND_NEXT_PUBLIC_API_URL }}" \
+              NEXT_PUBLIC_APP_URL="${{ secrets.FRONTEND_NEXT_PUBLIC_APP_URL }}" \
+              NEXT_PUBLIC_JWT_EXPIRY_TIME="${{ secrets.FRONTEND_NEXT_PUBLIC_JWT_EXPIRY_TIME }}" \
+              NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY="${{ secrets.FRONTEND_NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY }}" \
+              WEBSITES_PORT=3000
+
       - name: Restart web apps
         run: |
           az webapp restart --name ${{ env.BACKEND_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
