@@ -168,13 +168,20 @@ jobs:
               JWT_SECRET="${{ secrets.BACKEND_JWT_SECRET }}" \
               CORS_ALLOWED_ORIGINS="${{ secrets.BACKEND_CORS_ALLOWED_ORIGINS }}"
 
-      - name: Deploy backend to Azure Web App
-        id: deploy-backend
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.BACKEND_APP_NAME }}
-          slot-name: 'Production'
-          package: '*.jar'
+      - name: Set backend startup command
+        run: |
+          az webapp config set \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --startup-file "java -jar /home/site/wwwroot/*.jar"
+
+            - name: Deploy backend to Azure Web App
+              id: deploy-backend
+              uses: azure/webapps-deploy@v3
+              with:
+                app-name: ${{ env.BACKEND_APP_NAME }}
+                slot-name: 'Production'
+                package: '*.jar'
 
       - name: Create/Update frontend web app
         run: |
@@ -197,6 +204,11 @@ jobs:
               NEXT_PUBLIC_APP_URL="${{ secrets.FRONTEND_NEXT_PUBLIC_APP_URL }}" \
               NEXT_PUBLIC_JWT_EXPIRY_TIME="${{ secrets.FRONTEND_NEXT_PUBLIC_JWT_EXPIRY_TIME }}" \
               NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY="${{ secrets.FRONTEND_NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY }}"
+          
+          az webapp config set \
+            --name ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --startup-file "npx next start -p 3000"
 
       - name: Deploy frontend to Azure Web App
         id: deploy-frontend
