@@ -24,6 +24,9 @@ FROM bellsoft/liberica-openjre-alpine:17-cds
 
 WORKDIR /app
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
 # Copy the built JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
@@ -45,16 +48,15 @@ ENV JWT_REFRESH_EXPIRATION=604800000
 ENV CORS_ALLOWED_ORIGINS=*
 ENV SHOW_SQL=false
 ENV LOG_LEVEL=info
+ENV SERVER_PORT=8080
 
 # Run as non-root
 USER spring:spring
 
 EXPOSE 8080
 
-# Health check (curl may not be present in image; it's left as-is but you can
-# swap to an HTTP client available in your environment or implement a small
-# health-check binary). This runs as the non-root user.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Health check (curl is now available)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 # Entrypoint handles loading secrets from runtime sources and then execs the

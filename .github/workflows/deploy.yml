@@ -114,11 +114,40 @@ jobs:
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --settings \
               WEBSITES_PORT=8080 \
+              SERVER_PORT=8080 \
               SPRING_PROFILES_ACTIVE=prod \
-              JAVA_OPTS="-Xmx128m -Xms64m"
+              JAVA_OPTS="-Xmx512m -Xms256m -Djava.security.egd=file:/dev/./urandom" \
+              WEBSITES_CONTAINER_START_TIME_LIMIT=180
 
       - name: Configure backend application settings (secrets from GitHub)
         run: |
+          # Debug: Show what secrets are available (without revealing values)
+          echo "Checking secrets availability..."
+          echo "DATABASE_URL: ${{ secrets.BACKEND_DATABASE_URL != '' && 'SET' || 'NOT SET' }}"
+          echo "DATABASE_USERNAME: ${{ secrets.BACKEND_DATABASE_USERNAME != '' && 'SET' || 'NOT SET' }}"
+          echo "DATABASE_PASSWORD: ${{ secrets.BACKEND_DATABASE_PASSWORD != '' && 'SET' || 'NOT SET' }}"
+          echo "JWT_SECRET: ${{ secrets.BACKEND_JWT_SECRET != '' && 'SET' || 'NOT SET' }}"
+          
+          # Validate that required secrets are set
+          if [ -z "${{ secrets.BACKEND_DATABASE_URL }}" ]; then
+            echo "ERROR: BACKEND_DATABASE_URL secret is not set!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.BACKEND_DATABASE_USERNAME }}" ]; then
+            echo "ERROR: BACKEND_DATABASE_USERNAME secret is not set!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.BACKEND_DATABASE_PASSWORD }}" ]; then
+            echo "ERROR: BACKEND_DATABASE_PASSWORD secret is not set!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.BACKEND_JWT_SECRET }}" ]; then
+            echo "ERROR: BACKEND_JWT_SECRET secret is not set!"
+            exit 1
+          fi
+          
+          echo "All required secrets are set. Proceeding with deployment..."
+          
           az webapp config appsettings set \
             --name ${{ env.BACKEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
@@ -129,7 +158,10 @@ jobs:
               JWT_SECRET="${{ secrets.BACKEND_JWT_SECRET }}" \
               CORS_ALLOWED_ORIGINS="${{ secrets.BACKEND_CORS_ALLOWED_ORIGINS }}" \
               SPRING_PROFILES_ACTIVE=prod \
-              WEBSITES_PORT=8080
+              SERVER_PORT=8080 \
+              WEBSITES_PORT=8080 \
+              LOG_LEVEL=INFO \
+              SHOW_SQL=false
 
       - name: Create/Update frontend web app
         run: |
@@ -156,7 +188,9 @@ jobs:
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --settings \
               WEBSITES_PORT=3000 \
-              NEXT_PUBLIC_API_URL=https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net
+              NODE_ENV=production \
+              NEXT_PUBLIC_API_URL=https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net \
+              NEXT_PUBLIC_APP_URL=https://${{ env.FRONTEND_APP_NAME }}.azurewebsites.net
 
       - name: Configure frontend application settings (secrets from GitHub)
         run: |
@@ -180,3 +214,51 @@ jobs:
           echo "🚀 Deployment completed!"
           echo "Backend: https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net"
           echo "Frontend: https://${{ env.FRONTEND_APP_NAME }}.azurewebsites.net"
+          
+      - name: Check backend health after deployment
+        run: |
+          echo "⏳ Waiting for backend to start..."
+          sleep 60
+          
+          echo "🔍 Checking backend health endpoint..."
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+            
+            if curl -f -v --max-time 30 https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net/actuator/health; then
+              echo "✅ Backend health check passed!"
+              break
+            else
+              echo "❌ Health check failed on attempt $((RETRY_COUNT + 1))"
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⏳ Waiting 30 seconds before retry..."
+                sleep 30
+              fi
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "🚨 All health check attempts failed!"
+            echo "📋 Attempting to download application logs for debugging..."
+            
+            az webapp log download \
+              --name ${{ env.BACKEND_APP_NAME }} \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --log-file backend-logs.zip || echo "Could not download logs"
+              
+            if [ -f backend-logs.zip ]; then
+              echo "📄 Extracting logs..."
+              unzip -l backend-logs.zip || echo "Could not extract logs"
+            fi
+            
+            echo "🔍 Checking container logs..."
+            az webapp log tail \
+              --name ${{ env.BACKEND_APP_NAME }} \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} || echo "Could not tail logs"
+              
+            exit 1
+          fi
