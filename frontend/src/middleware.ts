@@ -69,7 +69,9 @@ function getUserRoles(request: NextRequest): string[] {
     const userCookie = request.cookies.get('uni_user_data')?.value;
     if (userCookie) {
       const userData = JSON.parse(decodeURIComponent(userCookie));
-      return userData.roles || [];
+      // Fix: Use 'role' (singular) instead of 'roles' (plural) to match the API schema
+      const role = userData.role;
+      return role ? [role] : [];
     }
     
     // Fallback: try to get from headers (for API requests)

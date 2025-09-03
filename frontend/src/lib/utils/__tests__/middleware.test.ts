@@ -136,39 +136,43 @@ describe('Middleware Helper Functions', () => {
   });
 
   describe('User Role Extraction', () => {
-    it('should extract roles from user data', () => {
+    it('should extract role from user data', () => {
       const getUserRoles = (userData: string | null): string[] => {
         try {
           if (!userData) return [];
           const parsed = JSON.parse(decodeURIComponent(userData));
-          return parsed.roles || [];
+          // Fix: Use 'role' (singular) instead of 'roles' (plural) to match API schema
+          const role = parsed.role;
+          return role ? [role] : [];
         } catch {
           return [];
         }
       };
 
-      const validUserData = encodeURIComponent(JSON.stringify({ roles: ['STUDENT', 'USER'] }));
+      const validUserData = encodeURIComponent(JSON.stringify({ role: 'STUDENT' }));
       const invalidUserData = 'invalid-json';
       
-      expect(getUserRoles(validUserData)).toEqual(['STUDENT', 'USER']);
+      expect(getUserRoles(validUserData)).toEqual(['STUDENT']);
       expect(getUserRoles(invalidUserData)).toEqual([]);
       expect(getUserRoles(null)).toEqual([]);
     });
 
-    it('should handle missing roles property', () => {
+    it('should handle missing role property', () => {
       const getUserRoles = (userData: string | null): string[] => {
         try {
           if (!userData) return [];
           const parsed = JSON.parse(decodeURIComponent(userData));
-          return parsed.roles || [];
+          // Fix: Use 'role' (singular) instead of 'roles' (plural) to match API schema
+          const role = parsed.role;
+          return role ? [role] : [];
         } catch {
           return [];
         }
       };
 
-      const userDataWithoutRoles = encodeURIComponent(JSON.stringify({ id: '1', name: 'Test' }));
+      const userDataWithoutRole = encodeURIComponent(JSON.stringify({ id: '1', name: 'Test' }));
       
-      expect(getUserRoles(userDataWithoutRoles)).toEqual([]);
+      expect(getUserRoles(userDataWithoutRole)).toEqual([]);
     });
   });
 

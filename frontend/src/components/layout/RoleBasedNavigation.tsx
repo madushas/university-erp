@@ -57,12 +57,6 @@ const navigationItems: NavigationItem[] = [
         href: '/courses/my',
         icon: GraduationCap,
         roles: ['STUDENT', 'INSTRUCTOR']
-      },
-      {
-        label: 'Course Management',
-        href: '/courses/manage',
-        icon: Settings,
-        roles: ['INSTRUCTOR', 'ADMIN']
       }
     ]
   },

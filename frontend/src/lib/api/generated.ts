@@ -3,9 +3,50 @@ import type { paths } from './schema';
 import { secureStorage } from '@/lib/utils/secureStorage';
 import { env } from '@/config/env';
 
+// Custom query serializer to handle complex objects and arrays
+const customQuerySerializer = (query: Record<string, unknown>): string => {
+  const params = new URLSearchParams();
+
+  const serializeValue = (key: string, value: unknown): void => {
+    if (value === null || value === undefined) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      // Handle arrays by creating multiple query parameters
+      value.forEach((item, index) => {
+        if (typeof item === 'object' && item !== null) {
+          // For complex objects in arrays, use bracket notation
+          Object.entries(item).forEach(([subKey, subValue]) => {
+            serializeValue(`${key}[${index}][${subKey}]`, subValue);
+          });
+        } else {
+          // For simple arrays, use repeated parameters
+          params.append(key, String(item));
+        }
+      });
+    } else if (typeof value === 'object' && value !== null) {
+      // Handle nested objects with dot notation
+      Object.entries(value).forEach(([subKey, subValue]) => {
+        serializeValue(`${key}.${subKey}`, subValue);
+      });
+    } else {
+      // Handle primitive values
+      params.append(key, String(value));
+    }
+  };
+
+  Object.entries(query).forEach(([key, value]) => {
+    serializeValue(key, value);
+  });
+
+  return params.toString();
+};
+
 // Create the main API client with authentication
 export const apiClient = createClient<paths>({
   baseUrl: env.API_URL,
+  querySerializer: customQuerySerializer,
 });
 
 // Add request interceptor for authentication
@@ -52,6 +93,7 @@ apiClient.use({
 // Create a public client for authentication endpoints (no auth required)
 export const publicApiClient = createClient<paths>({
   baseUrl: env.API_URL,
+  querySerializer: customQuerySerializer,
 });
 
 // Export typed API methods for easier usage
