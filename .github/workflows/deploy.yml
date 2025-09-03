@@ -32,11 +32,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase repository owner
+        run: |
+          echo "REPO_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Extract metadata for backend
         id: backend-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.BACKEND_IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -47,7 +51,7 @@ jobs:
         id: frontend-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.FRONTEND_IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -96,17 +100,8 @@ jobs:
             --name ${{ env.BACKEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --plan asp-university-erp \
-            --deployment-container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
+            --deployment-container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
             --output none || true
-
-          # Configure container settings
-          az webapp config container set \
-            --name ${{ env.BACKEND_APP_NAME }} \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
-            --container-registry-url https://${{ env.REGISTRY }} \
-            --container-registry-user ${{ github.actor }} \
-            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
 
           # Set application settings
           az webapp config appsettings set \
@@ -119,49 +114,14 @@ jobs:
               JAVA_OPTS="-Xmx512m -Xms256m -Djava.security.egd=file:/dev/./urandom" \
               WEBSITES_CONTAINER_START_TIME_LIMIT=180
 
-      - name: Configure backend application settings (secrets from GitHub)
-        run: |
-          # Debug: Show what secrets are available (without revealing values)
-          echo "Checking secrets availability..."
-          echo "DATABASE_URL: ${{ secrets.BACKEND_DATABASE_URL != '' && 'SET' || 'NOT SET' }}"
-          echo "DATABASE_USERNAME: ${{ secrets.BACKEND_DATABASE_USERNAME != '' && 'SET' || 'NOT SET' }}"
-          echo "DATABASE_PASSWORD: ${{ secrets.BACKEND_DATABASE_PASSWORD != '' && 'SET' || 'NOT SET' }}"
-          echo "JWT_SECRET: ${{ secrets.BACKEND_JWT_SECRET != '' && 'SET' || 'NOT SET' }}"
-          
-          # Validate that required secrets are set
-          if [ -z "${{ secrets.BACKEND_DATABASE_URL }}" ]; then
-            echo "ERROR: BACKEND_DATABASE_URL secret is not set!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.BACKEND_DATABASE_USERNAME }}" ]; then
-            echo "ERROR: BACKEND_DATABASE_USERNAME secret is not set!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.BACKEND_DATABASE_PASSWORD }}" ]; then
-            echo "ERROR: BACKEND_DATABASE_PASSWORD secret is not set!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.BACKEND_JWT_SECRET }}" ]; then
-            echo "ERROR: BACKEND_JWT_SECRET secret is not set!"
-            exit 1
-          fi
-          
-          echo "All required secrets are set. Proceeding with deployment..."
-          
-          az webapp config appsettings set \
+          # Configure container settings AFTER setting environment variables
+          az webapp config container set \
             --name ${{ env.BACKEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --settings \
-              DATABASE_URL="${{ secrets.BACKEND_DATABASE_URL }}" \
-              DATABASE_USERNAME="${{ secrets.BACKEND_DATABASE_USERNAME }}" \
-              DATABASE_PASSWORD="${{ secrets.BACKEND_DATABASE_PASSWORD }}" \
-              JWT_SECRET="${{ secrets.BACKEND_JWT_SECRET }}" \
-              CORS_ALLOWED_ORIGINS="${{ secrets.BACKEND_CORS_ALLOWED_ORIGINS }}" \
-              SPRING_PROFILES_ACTIVE=prod \
-              SERVER_PORT=8080 \
-              WEBSITES_PORT=8080 \
-              LOG_LEVEL=INFO \
-              SHOW_SQL=false
+            --container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
+            --container-registry-url https://${{ env.REGISTRY }} \
+            --container-registry-user ${{ github.actor }} \
+            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create/Update frontend web app
         run: |
@@ -170,17 +130,8 @@ jobs:
             --name ${{ env.FRONTEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --plan asp-university-erp \
-            --deployment-container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
+            --deployment-container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
             --output none || true
-
-          # Configure container settings
-          az webapp config container set \
-            --name ${{ env.FRONTEND_APP_NAME }} \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
-            --container-registry-url https://${{ env.REGISTRY }} \
-            --container-registry-user ${{ github.actor }} \
-            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
 
           # Set application settings
           az webapp config appsettings set \
@@ -192,17 +143,14 @@ jobs:
               NEXT_PUBLIC_API_URL=https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net \
               NEXT_PUBLIC_APP_URL=https://${{ env.FRONTEND_APP_NAME }}.azurewebsites.net
 
-      - name: Configure frontend application settings (secrets from GitHub)
-        run: |
-          az webapp config appsettings set \
+          # Configure container settings AFTER setting environment variables
+          az webapp config container set \
             --name ${{ env.FRONTEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --settings \
-              NEXT_PUBLIC_API_URL="${{ secrets.FRONTEND_NEXT_PUBLIC_API_URL }}" \
-              NEXT_PUBLIC_APP_URL="${{ secrets.FRONTEND_NEXT_PUBLIC_APP_URL }}" \
-              NEXT_PUBLIC_JWT_EXPIRY_TIME="${{ secrets.FRONTEND_NEXT_PUBLIC_JWT_EXPIRY_TIME }}" \
-              NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY="${{ secrets.FRONTEND_NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY }}" \
-              WEBSITES_PORT=3000
+            --container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
+            --container-registry-url https://${{ env.REGISTRY }} \
+            --container-registry-user ${{ github.actor }} \
+            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restart web apps
         run: |
