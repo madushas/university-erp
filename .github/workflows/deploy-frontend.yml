@@ -1,0 +1,66 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_WEBAPP_NAME: myapp-frontend
+  AZURE_RESOURCE_GROUP: rg-myapp-prod
+  NODE_VERSION: 20
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        # if you use NEXT_PUBLIC_API_URL etc, define them in App Service Application settings
+        # or pass build-time env through env block
+
+      - name: Package for deploy
+        run: |
+          # For Next server runtime, zip the full app with node_modules and .next
+          # Keep the package.json with "start": "next start"
+          zip -r ../frontend.zip . -x "*.git*"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_FRONTEND }}
+          package: frontend.zip
+
+      - name: Smoke test
+        run: |
+          curl -sSf "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net" | head -n 20 || true
