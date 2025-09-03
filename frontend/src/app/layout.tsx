@@ -1,32 +1,32 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import Providers from "@/components/providers";
-import LayoutWrapper from "@/components/layout/layout-wrapper";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { AuthProvider } from '@/components/auth/AuthProvider';
+import { ConditionalHeader } from '@/components/layout/ConditionalHeader';
+import { Toaster } from 'sonner';
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "University ERP System",
-  description: "University Enterprise Resource Planning System",
+  title: 'University Portal',
+  description: 'University Management System',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased bg-gray-50 min-h-screen`}>
-        <Providers>
-          <LayoutWrapper>
+      <body className={inter.className}>
+        <AuthProvider>
+          <ConditionalHeader />
+          <main className="min-h-screen bg-gray-50">
             {children}
-          </LayoutWrapper>
-        </Providers>
+          </main>
+          <Toaster position="top-right" />
+        </AuthProvider>
       </body>
     </html>
   );
