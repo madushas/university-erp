@@ -2,6 +2,23 @@
 
 A comprehensive Enterprise Resource Planning (ERP) system built for university course management with modern web technologies.
 
+## Live Demo
+
+[![University ERP System](docs/images/image.png)](https://university-erp.madusha.dev)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [Live Demo](https://university-erp.madusha.dev)
+
+
+## Demo Credentials
+
+| Role | Username | Password |
+| ---- | -------- | -------- |
+| Admin | admin | password |
+| Student | john_doe | password |
+| Instructor | dr_smith | password |
+
+
+
 ## Features
 
 ### Core Functionality
@@ -111,8 +128,8 @@ erp-app/
 
 ### Production Deployment
 - Backend: Deployed on Azure App Service
-- Frontend: Deployed on Vercel/Netlify
-- Database: PostgreSQL on Azure Database
+- Frontend: Deployed on Azure App Service
+- Database: PostgreSQL on Aiven Postgres
 
 ### Environment Variables
 
@@ -127,15 +144,17 @@ JWT_EXPIRATION=86400000
 
 **Frontend**
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
-NEXT_PUBLIC_APP_NAME=University Course Management
+NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_JWT_EXPIRY_TIME=900000
+NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY=604800000
 ```
 
 ## API Documentation
 
 Once the backend is running, visit:
 - Swagger UI: http://localhost:8080/swagger-ui.html
-- API Docs: http://localhost:8080/v3/api-docs
+- API Docs: http://localhost:8080/api-docs
 
 ## Testing
 
@@ -177,8 +196,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contributors
 
-- [Your Name] - Initial development
+- [Madusha Sandaruwan] - Initial development
 
 ## Support
 
-For support, email [your-email] or create an issue in this repository.
+For support, email [work@madusha.dev] or create an issue in this repository.
