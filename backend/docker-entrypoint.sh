@@ -27,6 +27,15 @@ CORS_ALLOWED_ORIGINS=$(read_secret CORS_ALLOWED_ORIGINS)
 # Validate presence of required secrets. Note the spaces in the test are required.
 if [ -z "$DB_USER" ] || [ -z "$DB_PASS" ] || [ -z "$JWT_SECRET" ] || [ -z "$DB_URL" ]; then
   echo "ERROR: Required secrets not provided. Provide DATABASE_URL, DATABASE_USERNAME, DATABASE_PASSWORD and JWT_SECRET via Docker secrets (preferred) or environment variables." >&2
+  echo "Current values (debug):" >&2
+  echo "  DATABASE_URL: '${DB_URL}'" >&2
+  echo "  DATABASE_USERNAME: '${DB_USER}'" >&2
+  echo "  DATABASE_PASSWORD: [${#DB_PASS} chars]" >&2
+  echo "  JWT_SECRET: [${#JWT_SECRET} chars]" >&2
+  echo "" >&2
+  echo "Environment variables available:" >&2
+  env | grep -E "(DATABASE|JWT|SPRING|SERVER)" | sort >&2
+  echo "" >&2
   echo "You can provide secrets at runtime with: docker run --env-file .env --secret source=jwt_secret,target=JWT_SECRET ..." >&2
   exit 1
 fi
