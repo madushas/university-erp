@@ -1,0 +1,121 @@
+spring:
+  application:
+    name: university-course-management
+  
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/erp_stuff}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:12345}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+      pool-name: UniversityHikariCP
+      auto-commit: false
+      connection-test-query: SELECT 1
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 10
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        query:
+          plan_cache_max_size: 2048
+          plan_parameter_metadata_max_size: 128
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+  
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=300s
+    cache-names:
+      - courses
+      - users
+      - student-records
+      - applications
+      - degree-audits
+      - transcripts
+      - financial-accounts
+      - billing-statements
+      - leave-types
+      - leave-requests
+  
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    default-schema: public
+
+server:
+  port: ${SERVER_PORT:8080}
+  undertow:
+    threads:
+      io: ${UNDERTOW_IO_THREADS:4}
+      worker: ${UNDERTOW_WORKER_THREADS:64}
+    buffer-size: ${UNDERTOW_BUFFER_SIZE:1024}
+    direct-buffers: ${UNDERTOW_DIRECT_BUFFERS:true}
+  connection-timeout: 30000
+  servlet:
+    session:
+      timeout: 30m
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,configprops,loggers,threaddump,heapdump
+  endpoint:
+    health:
+      show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+logging:
+  level:
+    '[com.university.backend]': ${LOG_LEVEL:WARN}
+    '[com.university.backend.interceptor]': INFO
+    '[com.university.backend.service.PerformanceMonitoringService]': WARN
+    '[org.springframework.security]': ${SECURITY_LOG_LEVEL:WARN}
+    '[org.hibernate.SQL]': WARN
+    '[org.springframework.web.servlet.DispatcherServlet]': INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{requestId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{requestId:-}] %logger{36} - %msg%n"
+  file:
+    name: logs/university-backend.log
+    max-size: 100MB
+    max-history: 30
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:production-secret-key-change-this-in-production-environment-this-needs-to-be-at-least-512-bits-long-for-HS512-algorithm-security}
+    expiration: ${JWT_EXPIRATION:86400000} # 24 hours
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  timeout:
+    request: ${REQUEST_TIMEOUT:30000} # 30 seconds
+    database: ${DATABASE_TIMEOUT:5000} # 5 seconds
+    circuit-breaker:
+      failure-threshold: ${CIRCUIT_BREAKER_FAILURE_THRESHOLD:5}
+      timeout: ${CIRCUIT_BREAKER_TIMEOUT:10000} # 10 seconds
+      reset-timeout: ${CIRCUIT_BREAKER_RESET_TIMEOUT:60000} # 60 seconds

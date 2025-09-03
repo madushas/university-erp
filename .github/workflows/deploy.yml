@@ -1,0 +1,169 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: university-erp-backend
+  FRONTEND_IMAGE_NAME: university-erp-frontend
+  AZURE_RESOURCE_GROUP: rg-university-erp
+  BACKEND_APP_NAME: university-erp-backend
+  FRONTEND_APP_NAME: university-erp-frontend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for backend
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix={{branch}}-
+
+      - name: Extract metadata for frontend
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Azure resources if they don't exist
+        run: |
+          # Create resource group if it doesn't exist
+          az group create --name ${{ env.AZURE_RESOURCE_GROUP }} --location eastus --output none || true
+          
+          # Create app service plan (F1 - Free tier)
+          az appservice plan create \
+            --name asp-university-erp \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --location eastus \
+            --sku F1 \
+            --is-linux \
+            --output none || true
+
+      - name: Create/Update backend web app
+        run: |
+          # Create web app for containers if it doesn't exist
+          az webapp create \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --plan asp-university-erp \
+            --deployment-container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
+            --output none || true
+
+          # Configure container settings
+          az webapp config container set \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
+            --container-registry-url https://${{ env.REGISTRY }} \
+            --container-registry-user ${{ github.actor }} \
+            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
+
+          # Set application settings
+          az webapp config appsettings set \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --settings \
+              WEBSITES_PORT=8080 \
+              SPRING_PROFILES_ACTIVE=prod \
+              JAVA_OPTS="-Xmx128m -Xms64m"
+
+      - name: Configure backend application settings (secrets from GitHub)
+        run: |
+          az webapp config appsettings set \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --settings \
+              DATABASE_URL="${{ secrets.BACKEND_DATABASE_URL }}" \
+              DATABASE_USERNAME="${{ secrets.BACKEND_DATABASE_USERNAME }}" \
+              DATABASE_PASSWORD="${{ secrets.BACKEND_DATABASE_PASSWORD }}" \
+              JWT_SECRET="${{ secrets.BACKEND_JWT_SECRET }}" \
+              SPRING_PROFILES_ACTIVE=prod \
+              WEBSITES_PORT=8080
+
+      - name: Create/Update frontend web app
+        run: |
+          # Create web app for containers if it doesn't exist
+          az webapp create \
+            --name ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --plan asp-university-erp \
+            --deployment-container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
+            --output none || true
+
+          # Configure container settings
+          az webapp config container set \
+            --name ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --container-image-name ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
+            --container-registry-url https://${{ env.REGISTRY }} \
+            --container-registry-user ${{ github.actor }} \
+            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
+
+          # Set application settings
+          az webapp config appsettings set \
+            --name ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --settings \
+              WEBSITES_PORT=3000 \
+              NEXT_PUBLIC_API_URL=https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net
+
+      - name: Restart web apps
+        run: |
+          az webapp restart --name ${{ env.BACKEND_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+          az webapp restart --name ${{ env.FRONTEND_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+
+      - name: Show deployment URLs
+        run: |
+          echo "🚀 Deployment completed!"
+          echo "Backend: https://${{ env.BACKEND_APP_NAME }}.azurewebsites.net"
+          echo "Frontend: https://${{ env.FRONTEND_APP_NAME }}.azurewebsites.net"
