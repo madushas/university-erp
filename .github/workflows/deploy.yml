@@ -67,19 +67,29 @@ jobs:
             exit 1
           fi
           
-          echo "✅ All required backend secrets are available!"
+          # Frontend secrets validation
+          if [ -z "${{ secrets.FRONTEND_NEXT_PUBLIC_API_URL }}" ]; then
+            echo "❌ ERROR: FRONTEND_NEXT_PUBLIC_API_URL secret is not set!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.FRONTEND_NEXT_PUBLIC_APP_URL }}" ]; then
+            echo "❌ ERROR: FRONTEND_NEXT_PUBLIC_APP_URL secret is not set!"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are available!"
 
       - name: Create Azure resources if they don't exist
         run: |
           # Create resource group if it doesn't exist
           az group create --name ${{ env.AZURE_RESOURCE_GROUP }} --location eastus --output none || true
           
-          # Create app service plan (F1 - Free tier)
+          # Create app service plan (B1 - Basic tier for better performance)
           az appservice plan create \
             --name asp-university-erp \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --location eastus \
-            --sku F1 \
+            --sku B1 \
             --is-linux \
             --output none || true
 
@@ -101,7 +111,8 @@ jobs:
               WEBSITES_PORT=8080 \
               SERVER_PORT=8080 \
               SPRING_PROFILES_ACTIVE=prod \
-              JAVA_OPTS="-Xmx512m -Xms256m -Djava.security.egd=file:/dev/./urandom" \
+              JAVA_OPTS="-Xmx256m -Xms128m -Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom" \
+              WEBSITE_TIME_ZONE="UTC" \
               DATABASE_URL="${{ secrets.BACKEND_DATABASE_URL }}" \
               DATABASE_USERNAME="${{ secrets.BACKEND_DATABASE_USERNAME }}" \
               DATABASE_PASSWORD="${{ secrets.BACKEND_DATABASE_PASSWORD }}" \
@@ -119,11 +130,17 @@ jobs:
           JAR_FILE=$(find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" | head -1)
           echo "Deploying JAR file: $JAR_FILE"
           
-          # Deploy the JAR file to Azure App Service  
-          az webapp deployment source config-zip \
+          # Use the new az webapp deploy command instead of deprecated config-zip
+          az webapp deploy \
             --name ${{ env.BACKEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --src "$JAR_FILE"
+            --src-path "$JAR_FILE" \
+            --type jar \
+            --async false \
+            --timeout 600
+          
+          # Return to root directory
+          cd ..
 
       - name: Create/Update frontend web app (Node.js deployment)
         run: |
@@ -132,7 +149,7 @@ jobs:
             --name ${{ env.FRONTEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --plan asp-university-erp \
-            --runtime "NODE:18-lts" \
+            --runtime "NODE:22-lts" \
             --output none || true
 
           # Set ALL application settings (including secrets)
@@ -152,30 +169,31 @@ jobs:
           # Build and deploy the frontend
           cd frontend
           
-          # Check if we're using pnpm or npm
-          if [ -f "pnpm-lock.yaml" ]; then
-            npm install -g pnpm
-            pnpm install
-            pnpm run build
-          else
-            npm ci
-            npm run build
-          fi
+          # Install dependencies and build (pnpm is already available)
+          pnpm install
+          pnpm run build
           
           # Create deployment package (exclude node_modules and cache)
           zip -r ../frontend-deploy.zip . -x "node_modules/*" ".next/cache/*" "test-results/*" "playwright-report/*"
           cd ..
           
-          # Deploy to Azure App Service
-          az webapp deployment source config-zip \
+          # Use the new az webapp deploy command for consistency
+          az webapp deploy \
             --name ${{ env.FRONTEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --src frontend-deploy.zip
+            --src-path frontend-deploy.zip \
+            --type zip \
+            --async false \
+            --timeout 600
 
       - name: Restart web apps
         run: |
+          echo "🔄 Restarting applications..."
           az webapp restart --name ${{ env.BACKEND_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
           az webapp restart --name ${{ env.FRONTEND_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+          
+          echo "⏳ Waiting for restart to complete..."
+          sleep 30
 
       - name: Show deployment URLs
         run: |
@@ -186,10 +204,10 @@ jobs:
       - name: Check backend health after deployment
         run: |
           echo "⏳ Waiting for backend to start..."
-          sleep 60
+          sleep 90
           
           echo "🔍 Checking backend health endpoint..."
-          MAX_RETRIES=5
+          MAX_RETRIES=10
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
