@@ -1,4 +1,4 @@
-name: Deploy to Azure
+name: Build and deploy to Azure Web Apps
 
 on:
   push:
@@ -11,21 +11,20 @@ env:
   FRONTEND_APP_NAME: university-erp-frontend
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Set up Java version
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
           java-version: '17'
+          distribution: 'temurin'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -39,6 +38,56 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Build backend with Maven
+        run: |
+          cd backend
+          chmod +x mvnw
+          ./mvnw clean install -DskipTests
+          cd ..
+
+      - name: Build frontend with pnpm
+        run: |
+          cd frontend
+          pnpm install
+          pnpm run build
+          cd ..
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: 'backend/target/*.jar'
+
+      - name: Create frontend deployment package
+        run: |
+          cd frontend
+          zip -r ../frontend-deploy.zip . -x "node_modules/*" ".next/cache/*" "test-results/*" "playwright-report/*"
+          cd ..
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-app
+          path: 'frontend-deploy.zip'
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-app
 
       - name: Azure Login
         uses: azure/login@v2
@@ -93,7 +142,7 @@ jobs:
             --is-linux \
             --output none || true
 
-      - name: Create/Update backend web app (JAR deployment)
+      - name: Create/Update backend web app
         run: |
           # Create web app for JAR deployment
           az webapp create \
@@ -103,7 +152,7 @@ jobs:
             --runtime "JAVA:17-java17" \
             --output none || true
 
-          # Set ALL application settings (including secrets)
+          # Set application settings
           az webapp config appsettings set \
             --name ${{ env.BACKEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
@@ -119,30 +168,15 @@ jobs:
               JWT_SECRET="${{ secrets.BACKEND_JWT_SECRET }}" \
               CORS_ALLOWED_ORIGINS="${{ secrets.BACKEND_CORS_ALLOWED_ORIGINS }}"
 
-      - name: Deploy backend JAR to Azure
-        run: |
-          # Build the JAR file first
-          cd backend
-          chmod +x mvnw
-          ./mvnw clean package -DskipTests
-          
-          # Find the JAR file and deploy it
-          JAR_FILE=$(find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" | head -1)
-          echo "Deploying JAR file: $JAR_FILE"
-          
-          # Use the new az webapp deploy command instead of deprecated config-zip
-          az webapp deploy \
-            --name ${{ env.BACKEND_APP_NAME }} \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --src-path "$JAR_FILE" \
-            --type jar \
-            --async false \
-            --timeout 600
-          
-          # Return to root directory
-          cd ..
+      - name: Deploy backend to Azure Web App
+        id: deploy-backend
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.BACKEND_APP_NAME }}
+          slot-name: 'Production'
+          package: '*.jar'
 
-      - name: Create/Update frontend web app (Node.js deployment)
+      - name: Create/Update frontend web app
         run: |
           # Create web app for Node.js deployment
           az webapp create \
@@ -152,7 +186,7 @@ jobs:
             --runtime "NODE:22-lts" \
             --output none || true
 
-          # Set ALL application settings (including secrets)
+          # Set application settings
           az webapp config appsettings set \
             --name ${{ env.FRONTEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
@@ -164,36 +198,13 @@ jobs:
               NEXT_PUBLIC_JWT_EXPIRY_TIME="${{ secrets.FRONTEND_NEXT_PUBLIC_JWT_EXPIRY_TIME }}" \
               NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY="${{ secrets.FRONTEND_NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY }}"
 
-      - name: Deploy frontend to Azure
-        run: |
-          # Build and deploy the frontend
-          cd frontend
-          
-          # Install dependencies and build (pnpm is already available)
-          pnpm install
-          pnpm run build
-          
-          # Create deployment package (exclude node_modules and cache)
-          zip -r ../frontend-deploy.zip . -x "node_modules/*" ".next/cache/*" "test-results/*" "playwright-report/*"
-          cd ..
-          
-          # Use the new az webapp deploy command for consistency
-          az webapp deploy \
-            --name ${{ env.FRONTEND_APP_NAME }} \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --src-path frontend-deploy.zip \
-            --type zip \
-            --async false \
-            --timeout 600
-
-      - name: Restart web apps
-        run: |
-          echo "🔄 Restarting applications..."
-          az webapp restart --name ${{ env.BACKEND_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
-          az webapp restart --name ${{ env.FRONTEND_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
-          
-          echo "⏳ Waiting for restart to complete..."
-          sleep 30
+      - name: Deploy frontend to Azure Web App
+        id: deploy-frontend
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FRONTEND_APP_NAME }}
+          slot-name: 'Production'
+          package: 'frontend-deploy.zip'
 
       - name: Show deployment URLs
         run: |
