@@ -6,9 +6,6 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE_NAME: university-erp-backend
-  FRONTEND_IMAGE_NAME: university-erp-frontend
   AZURE_RESOURCE_GROUP: rg-university-erp
   BACKEND_APP_NAME: university-erp-backend
   FRONTEND_APP_NAME: university-erp-frontend
@@ -18,61 +15,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
       id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Set lowercase repository owner
-        run: |
-          echo "REPO_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      - name: Extract metadata for backend
-        id: backend-meta
-        uses: docker/metadata-action@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.BACKEND_IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix={{branch}}-
-
-      - name: Extract metadata for frontend
-        id: frontend-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.FRONTEND_IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix={{branch}}-
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ steps.backend-meta.outputs.tags }}
-          labels: ${{ steps.backend-meta.outputs.labels }}
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: ${{ steps.frontend-meta.outputs.tags }}
-          labels: ${{ steps.frontend-meta.outputs.labels }}
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Azure Login
         uses: azure/login@v2
@@ -117,26 +77,17 @@ jobs:
             --is-linux \
             --output none || true
 
-      - name: Create/Update backend web app
+      - name: Create/Update backend web app (JAR deployment)
         run: |
-          # Create web app for containers if it doesn't exist
+          # Create web app for JAR deployment
           az webapp create \
             --name ${{ env.BACKEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --plan asp-university-erp \
-            --deployment-container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
+            --runtime "JAVA:17-java17" \
             --output none || true
 
-          # Configure container settings
-          az webapp config container set \
-            --name ${{ env.BACKEND_APP_NAME }} \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.BACKEND_IMAGE_NAME }}:latest \
-            --container-registry-url https://${{ env.REGISTRY }} \
-            --container-registry-user ${{ github.actor }} \
-            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
-
-          # Set ALL application settings (including secrets) in one step
+          # Set ALL application settings (including secrets)
           az webapp config appsettings set \
             --name ${{ env.BACKEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
@@ -145,33 +96,40 @@ jobs:
               SERVER_PORT=8080 \
               SPRING_PROFILES_ACTIVE=prod \
               JAVA_OPTS="-Xmx512m -Xms256m -Djava.security.egd=file:/dev/./urandom" \
-              WEBSITES_CONTAINER_START_TIME_LIMIT=180 \
               DATABASE_URL="${{ secrets.BACKEND_DATABASE_URL }}" \
               DATABASE_USERNAME="${{ secrets.BACKEND_DATABASE_USERNAME }}" \
               DATABASE_PASSWORD="${{ secrets.BACKEND_DATABASE_PASSWORD }}" \
               JWT_SECRET="${{ secrets.BACKEND_JWT_SECRET }}" \
               CORS_ALLOWED_ORIGINS="${{ secrets.BACKEND_CORS_ALLOWED_ORIGINS }}"
 
-      - name: Create/Update frontend web app
+      - name: Deploy backend JAR to Azure
         run: |
-          # Create web app for containers if it doesn't exist
+          # Build the JAR file first
+          cd backend
+          chmod +x mvnw
+          ./mvnw clean package -DskipTests
+          
+          # Find the JAR file and deploy it
+          JAR_FILE=$(find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" | head -1)
+          echo "Deploying JAR file: $JAR_FILE"
+          
+          # Deploy the JAR file to Azure App Service  
+          az webapp deployment source config-zip \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --src "$JAR_FILE"
+
+      - name: Create/Update frontend web app (Node.js deployment)
+        run: |
+          # Create web app for Node.js deployment
           az webapp create \
             --name ${{ env.FRONTEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --plan asp-university-erp \
-            --deployment-container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
+            --runtime "NODE:18-lts" \
             --output none || true
 
-          # Configure container settings
-          az webapp config container set \
-            --name ${{ env.FRONTEND_APP_NAME }} \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --container-image-name ${{ env.REGISTRY }}/${{ env.REPO_OWNER_LOWER }}/${{ env.FRONTEND_IMAGE_NAME }}:latest \
-            --container-registry-url https://${{ env.REGISTRY }} \
-            --container-registry-user ${{ github.actor }} \
-            --container-registry-password ${{ secrets.GITHUB_TOKEN }}
-
-          # Set ALL application settings (including secrets) in one step
+          # Set ALL application settings (including secrets)
           az webapp config appsettings set \
             --name ${{ env.FRONTEND_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
@@ -182,6 +140,31 @@ jobs:
               NEXT_PUBLIC_APP_URL="${{ secrets.FRONTEND_NEXT_PUBLIC_APP_URL }}" \
               NEXT_PUBLIC_JWT_EXPIRY_TIME="${{ secrets.FRONTEND_NEXT_PUBLIC_JWT_EXPIRY_TIME }}" \
               NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY="${{ secrets.FRONTEND_NEXT_PUBLIC_REFRESH_TOKEN_EXPIRY }}"
+
+      - name: Deploy frontend to Azure
+        run: |
+          # Build and deploy the frontend
+          cd frontend
+          
+          # Check if we're using pnpm or npm
+          if [ -f "pnpm-lock.yaml" ]; then
+            npm install -g pnpm
+            pnpm install
+            pnpm run build
+          else
+            npm ci
+            npm run build
+          fi
+          
+          # Create deployment package (exclude node_modules and cache)
+          zip -r ../frontend-deploy.zip . -x "node_modules/*" ".next/cache/*" "test-results/*" "playwright-report/*"
+          cd ..
+          
+          # Deploy to Azure App Service
+          az webapp deployment source config-zip \
+            --name ${{ env.FRONTEND_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --src frontend-deploy.zip
 
       - name: Restart web apps
         run: |
