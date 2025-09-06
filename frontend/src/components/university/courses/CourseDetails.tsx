@@ -1,20 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useCourse } from '@/lib/hooks/useCourses';
 import { useRoleAccess } from '@/lib/hooks/useRoleAccess';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { getCourseRegistrations, RegistrationService } from '@/lib/api/registrations';
+import { RegistrationDto } from '@/lib/types/registration';
 
 interface CourseDetailsProps {
   courseId: number;
   onEdit?: () => void;
   onBack?: () => void;
   onRegister?: (courseId: number) => void;
+  initialTab?: TabType;
 }
 
-type TabType = 'overview' | 'schedule' | 'enrollment';
+type TabType = 'overview' | 'schedule' | 'enrollment' | 'students' | 'gradebook';
 
 const getStatusColor = (status?: string) => {
   switch (status) {
@@ -35,25 +39,65 @@ const getStatusColor = (status?: string) => {
   }
 };
 
-const formatTime = (time?: { hour?: number; minute?: number; second?: number; nano?: number }) => {
-  if (!time?.hour || !time?.minute) return 'TBA';
-  const hour = time.hour.toString().padStart(2, '0');
-  const minute = time.minute.toString().padStart(2, '0');
-  return `${hour}:${minute}`;
+const formatTime = (time?: unknown) => {
+  if (!time) return 'TBA';
+  if (typeof time === 'string') {
+    const parts = time.split(':');
+    if (parts.length >= 2) {
+      const [hh, mm] = parts;
+      return `${hh.padStart(2, '0')}:${mm.padStart(2, '0')}`;
+    }
+    return time;
+  }
+  if (typeof time === 'object' && time !== null && 'hour' in (time as Record<string, unknown>)) {
+    const t = time as { hour?: number; minute?: number };
+    const hour = String(t.hour ?? 0).padStart(2, '0');
+    const minute = String(t.minute ?? 0).padStart(2, '0');
+    return `${hour}:${minute}`;
+  }
+  return 'TBA';
 };
 
 export default function CourseDetails({ 
   courseId, 
   onEdit, 
   onBack, 
-  onRegister 
+  onRegister,
+  initialTab
 }: CourseDetailsProps) {
   const { course, loading, error, clearError } = useCourse(courseId);
-  const { canManageCourses, isStudent } = useRoleAccess();
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const { canManageCourses, isStudent, isInstructor } = useRoleAccess();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'overview');
+  const [registrations, setRegistrations] = useState<RegistrationDto[]>([]);
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
+  const [gradeInputs, setGradeInputs] = useState<Record<number, string>>({});
 
   const canManage = canManageCourses();
   const isStudentUser = isStudent();
+  const isInstructorUser = isInstructor();
+  const canViewStudents = canManage || (isInstructorUser && typeof user?.id === 'number' && course?.instructorId === user.id);
+  const canGrade = canManage; // TODO: enable instructor grading when backend allows
+
+  useEffect(() => {
+    if (!(activeTab === 'students' || activeTab === 'gradebook')) return;
+    if (!canViewStudents) return;
+    const run = async () => {
+      try {
+        setRegLoading(true);
+        setRegError(null);
+        const data = await getCourseRegistrations(courseId);
+        setRegistrations(data);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to load enrolled students';
+        setRegError(msg);
+      } finally {
+        setRegLoading(false);
+      }
+    };
+    run();
+  }, [activeTab, canViewStudents, courseId]);
 
   if (loading) {
     return (
@@ -97,6 +141,11 @@ export default function CourseDetails({
     course.status === 'ACTIVE' && 
     (course.enrolledStudents || 0) < (course.maxStudents || 0);
 
+  // Build tab list dynamically based on permissions
+  const baseTabs: TabType[] = ['overview', 'schedule', 'enrollment'];
+  const extraTabs: TabType[] = canViewStudents ? ['students', 'gradebook'] : [];
+  const tabs: TabType[] = [...baseTabs, ...extraTabs];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -138,7 +187,7 @@ export default function CourseDetails({
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
-          {['overview', 'schedule', 'enrollment'].map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as TabType)}
@@ -202,7 +251,7 @@ export default function CourseDetails({
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Instructor:</span>
-                  <span className="text-gray-900 font-medium">{course.instructor || 'TBA'}</span>
+                  <span className="text-gray-900 font-medium">{course.instructorName || 'TBA'}</span>
                 </div>
                 {course.instructorEmail && (
                   <div className="flex justify-between">
@@ -431,11 +480,11 @@ export default function CourseDetails({
             )}
           </Card>
 
-          {canManage && (
+          {(canManage || (isInstructorUser && typeof user?.id === 'number' && course.instructorId === user.id)) && (
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Enrollment Management</h3>
               <div className="flex gap-4">
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => setActiveTab('students')}>
                   View Enrolled Students
                 </Button>
                 <Button variant="outline">
@@ -447,6 +496,108 @@ export default function CourseDetails({
               </div>
             </Card>
           )}
+        </div>
+      )}
+
+      {activeTab === 'students' && (
+        <div className="space-y-6">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Enrolled Students</h3>
+            {regLoading && (
+              <div className="flex justify-center items-center h-24">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            )}
+            {regError && (
+              <div className="text-red-600 text-sm">{regError}</div>
+            )}
+            {!regLoading && !regError && (
+              registrations.length === 0 ? (
+                <div className="text-gray-600">No students enrolled yet.</div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {registrations.map((reg) => (
+                    <Card key={reg.id} className="p-4">
+                      <div className="font-medium text-gray-900">{reg.user?.firstName} {reg.user?.lastName}</div>
+                      <div className="text-sm text-gray-600">{reg.user?.email}</div>
+                      <div className="text-sm text-gray-700 mt-2">Status: {reg.status}</div>
+                      {reg.grade && <div className="text-sm text-gray-700">Grade: {reg.grade}</div>}
+                    </Card>
+                  ))}
+                </div>
+              )
+            )}
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'gradebook' && (
+        <div className="space-y-6">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Gradebook</h3>
+            {!canViewStudents && (
+              <div className="text-gray-600">You are not authorized to view this section.</div>
+            )}
+            {canViewStudents && (
+              registrations.length === 0 ? (
+                <div className="text-gray-600">No registrations available.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Grade</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">New Grade</th>
+                        <th className="px-4 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {registrations.map((reg) => (
+                        <tr key={reg.id}>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{reg.user?.firstName} {reg.user?.lastName}</td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{reg.status}</td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{reg.grade || '-'}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <input
+                              type="text"
+                              className="px-2 py-1 border border-gray-300 rounded-md text-sm"
+                              placeholder="e.g. A"
+                              disabled={!canGrade}
+                              value={gradeInputs[reg.id!] || ''}
+                              onChange={(e) => setGradeInputs((prev) => ({ ...prev, [reg.id!]: e.target.value }))}
+                            />
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-right text-sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={!canGrade}
+                              onClick={async () => {
+                                const grade = gradeInputs[reg.id!];
+                                if (!grade) return;
+                                const updated = await RegistrationService.updateRegistrationGrade(reg.id!, grade);
+                                if (updated) {
+                                  const data = await getCourseRegistrations(courseId);
+                                  setRegistrations(data);
+                                }
+                              }}
+                            >
+                              Update
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!canGrade && (
+                    <p className="text-xs text-gray-500 mt-2">Grade updates are restricted to administrators. (TODO: enable instructor grading)</p>
+                  )}
+                </div>
+              )
+            )}
+          </Card>
         </div>
       )}
     </div>

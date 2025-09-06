@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { env } from '@/config/env';
 import { secureStorage } from '@/lib/utils/secureStorage';
+import { AUTH_ROUTES } from '@/lib/utils/constants';
 import { isTokenExpired } from '@/lib/utils/jwt';
 import { refreshAccessToken } from './auth';
 
@@ -23,25 +24,35 @@ apiClient.interceptors.request.use(
       // Check if token is expired
       if (isTokenExpired(token)) {
         try {
+          console.log(' Token expired, attempting refresh...');
           const newToken = await refreshAccessToken();
           if (newToken) {
             config.headers.Authorization = `Bearer ${newToken}`;
+            console.log(' Token refreshed successfully');
+          } else {
+            console.warn(' Token refresh failed - no new token received');
+            throw new Error('Token refresh failed');
           }
-        } catch {
+        } catch (error) {
           // If refresh fails, clear auth data and redirect to login
+          console.error(' Token refresh failed:', error);
           secureStorage.clearAuthData();
           if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+            window.location.href = AUTH_ROUTES.LOGIN;
           }
+          throw error;
         }
       } else {
         config.headers.Authorization = `Bearer ${token}`;
       }
+    } else {
+      console.warn(' No access token found for API request to:', config.url);
     }
     
     return config;
   },
   (error: AxiosError) => {
+    console.error(' Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -66,7 +77,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         secureStorage.clearAuthData();
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          window.location.href = AUTH_ROUTES.LOGIN;
         }
         return Promise.reject(refreshError);
       }

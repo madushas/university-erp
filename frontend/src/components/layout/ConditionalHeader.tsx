@@ -10,6 +10,7 @@ export function ConditionalHeader() {
   const isProtectedRoute = pathname?.startsWith('/dashboard') || 
                           pathname?.startsWith('/admin') || 
                           pathname?.startsWith('/profile') ||
+                          pathname?.startsWith('/course') ||
                           pathname?.startsWith('/courses') ||
                           pathname?.startsWith('/hr');
   

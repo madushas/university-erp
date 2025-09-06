@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { secureStorage } from '@/lib/utils/secureStorage';
@@ -18,10 +19,11 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, checkRole } = useAuth();
   const router = useRouter();
-
-  // If localStorage already has auth data, treat that as an immediate authentication
-  // hint to avoid a short race where the AuthProvider hasn't hydrated yet.
-  const hasLocalAuth = typeof window !== 'undefined' && secureStorage.isAuthenticated();
+  // Track client mount to keep SSR and first client render consistent and avoid hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Only check local storage after mount (first client render keeps this false just like SSR)
+  const hasLocalAuth = mounted && secureStorage.isAuthenticated();
 
   useEffect(() => {
     if (!isLoading || hasLocalAuth) {
@@ -34,24 +36,8 @@ export function ProtectedRoute({
     }
   }, [isAuthenticated, isLoading, requiredRole, router, fallbackUrl, checkRole, hasLocalAuth]);
 
-  // If still loading and there's no local stored auth, show spinner
-  if (isLoading && !hasLocalAuth) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  // If not authenticated after loading and no local auth fallback, don't render children
-  if (!isAuthenticated && !hasLocalAuth) {
-    return null;
-  }
-
-  // If a required role is specified and the user doesn't have it (and we can't verify via local token), hide
-  if (requiredRole && !checkRole(requiredRole) && !hasLocalAuth) {
-    return null;
-  }
-
-  return <>{children}</>;
+  // Always render children to keep SSR and client trees consistent.
+  // Hide content visually until we either have local auth or loading completes.
+  const shouldHide = !mounted || (isLoading && !hasLocalAuth) || (!isAuthenticated && !hasLocalAuth) || (requiredRole && !checkRole(requiredRole) && !hasLocalAuth);
+  return <div style={{ visibility: shouldHide ? 'hidden' : 'visible' }}>{children}</div>;
 }

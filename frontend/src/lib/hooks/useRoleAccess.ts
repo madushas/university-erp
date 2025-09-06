@@ -31,7 +31,7 @@ export const useRoleAccess = () => {
   };
 
   const canManageCourses = (): boolean => {
-    return hasAnyRole(['ADMIN', 'INSTRUCTOR']);
+    return isAdmin(); // Only admins can manage courses per requirements
   };
 
   const canViewAllStudents = (): boolean => {

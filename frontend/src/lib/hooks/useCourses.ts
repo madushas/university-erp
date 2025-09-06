@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CourseService } from '@/lib/api/courses';
+import { api } from '@/lib/api/generated';
 import type { 
   CourseDto, 
   CourseRequest, 
   CourseSearchParams,
   PageCourseDto,
   CourseEnrollmentInfo,
-  CourseStatistics 
-} from '@/lib/types/course';
+  CourseStatistics, 
+  RegistrationDto
+} from '@/lib/types';
+
+const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 
 interface UseCoursesOptions {
   autoLoad?: boolean;
@@ -17,6 +21,7 @@ interface UseCoursesOptions {
 interface UseCoursesReturn {
   courses: CourseDto[];
   pagedCourses: PageCourseDto | null;
+  registrations: RegistrationDto[];
   loading: boolean;
   error: string | null;
   statistics: CourseStatistics | null;
@@ -27,11 +32,13 @@ interface UseCoursesReturn {
   searchCourses: (title: string) => Promise<void>;
   getCourseById: (id: number) => Promise<CourseDto | null>;
   getCourseByCode: (code: string) => Promise<CourseDto | null>;
+  getCoursesByInstructor: (instructor: string) => Promise<void>;
   createCourse: (courseData: CourseRequest) => Promise<CourseDto | null>;
   updateCourse: (id: number, courseData: CourseRequest) => Promise<CourseDto | null>;
   deleteCourse: (id: number) => Promise<boolean>;
   getCourseEnrollmentInfo: (courseId: number) => Promise<CourseEnrollmentInfo | null>;
   loadStatistics: () => Promise<void>;
+  loadRegistrations: () => Promise<void>;
   
   // Utilities
   clearError: () => void;
@@ -46,6 +53,7 @@ export function useCourses(options: UseCoursesOptions = {}): UseCoursesReturn {
   
   const [courses, setCourses] = useState<CourseDto[]>([]);
   const [pagedCourses, setPagedCourses] = useState<PageCourseDto | null>(null);
+  const [registrations, setRegistrations] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statistics, setStatistics] = useState<CourseStatistics | null>(null);
@@ -140,12 +148,33 @@ export function useCourses(options: UseCoursesOptions = {}): UseCoursesReturn {
   }, []);
 
   /**
+   * Get courses by instructor
+   */
+  const getCoursesByInstructor = useCallback(async (instructor: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await CourseService.getCoursesByInstructor(instructor);
+      setCourses(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch instructor courses';
+      setError(errorMessage);
+      console.error('Error fetching instructor courses:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
    * Create a new course
    */
   const createCourse = useCallback(async (courseData: CourseRequest): Promise<CourseDto | null> => {
+    if (DEBUG) console.log('🔥 useCourses.createCourse called with:', courseData);
     try {
       setError(null);
+      if (DEBUG) console.log('🔥 Calling CourseService.createCourse...');
       const newCourse = await CourseService.createCourse(courseData);
+      if (DEBUG) console.log('🔥 CourseService.createCourse returned:', newCourse);
       
       // Add to local state
       setCourses(prev => [...prev, newCourse]);
@@ -154,7 +183,7 @@ export function useCourses(options: UseCoursesOptions = {}): UseCoursesReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create course';
       setError(errorMessage);
-      console.error('Error creating course:', err);
+      console.error('🔥 Error creating course:', err);
       return null;
     }
   }, []);
@@ -232,6 +261,26 @@ export function useCourses(options: UseCoursesOptions = {}): UseCoursesReturn {
   }, []);
 
   /**
+   * Load registrations for the current user
+   */
+  const loadRegistrations = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.registrations.getAll();
+      if (response.data) {
+        setRegistrations(response.data);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load registrations';
+      setError(errorMessage);
+      console.error('Error loading registrations:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
    * Clear error state
    */
   const clearError = useCallback(() => {
@@ -263,6 +312,7 @@ export function useCourses(options: UseCoursesOptions = {}): UseCoursesReturn {
   return {
     courses,
     pagedCourses,
+    registrations,
     loading,
     error,
     statistics,
@@ -273,11 +323,13 @@ export function useCourses(options: UseCoursesOptions = {}): UseCoursesReturn {
     searchCourses,
     getCourseById,
     getCourseByCode,
+    getCoursesByInstructor,
     createCourse,
     updateCourse,
     deleteCourse,
     getCourseEnrollmentInfo,
     loadStatistics,
+    loadRegistrations,
     
     // Utilities
     clearError,

@@ -1,7 +1,9 @@
 import createClient from 'openapi-fetch';
 import type { paths } from './schema';
 import { secureStorage } from '@/lib/utils/secureStorage';
+import { AUTH_ROUTES } from '@/lib/utils/constants';
 import { env } from '@/config/env';
+const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 
 // Custom query serializer to handle complex objects and arrays
 const customQuerySerializer = (query: Record<string, unknown>): string => {
@@ -55,39 +57,79 @@ apiClient.use({
     const token = secureStorage.getAccessToken();
     if (token) {
       request.headers.set('Authorization', `Bearer ${token}`);
+      if (DEBUG) console.log(`🔑 Adding auth token to ${request.url}`);
+    } else {
+      console.warn(`⚠️ No token available for ${request.url}`);
     }
+    
+    // Log request details for debugging
+    if (DEBUG) console.log(`📤 API Request: ${request.method} ${request.url}`, {
+      headers: Object.fromEntries(request.headers.entries()),
+      hasBody: !!request.body
+    });
+    
     return request;
   },
-  
   async onResponse({ response, request }) {
-    // Handle 401 responses
+    if (DEBUG) console.log(`📥 API Response: ${response.status} ${request.url}`, {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText
+    });
+    
+    // Handle 401 Unauthorized - attempt token refresh
     if (response.status === 401) {
-      // Try to refresh token
-      try {
-        const refreshToken = secureStorage.getRefreshToken();
-        if (refreshToken) {
-          const { data: authResponse } = await publicApiClient.POST('/api/v1/auth/refresh', {
+      console.error(`🚫 401 Unauthorized for ${response.url}`);
+      
+      const refreshToken = secureStorage.getRefreshToken();
+      if (refreshToken && !request.url.includes('/auth/refresh')) {
+        if (DEBUG) console.log('🔄 Attempting token refresh...');
+        
+        try {
+          // Use public client for refresh to avoid infinite loop
+          const refreshResponse = await publicApiClient.POST('/api/v1/auth/refresh', {
             body: { refreshToken }
           });
           
-          if (authResponse) {
-            secureStorage.setAuthData(authResponse);
-            // Retry the original request
-            const newToken = authResponse.accessToken;
-            request.headers.set('Authorization', `Bearer ${newToken}`);
-            return fetch(request);
+          if (refreshResponse.data && refreshResponse.data.accessToken && refreshResponse.data.refreshToken) {
+            const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+            
+            // Update tokens in secure storage
+            secureStorage.setAccessToken(accessToken);
+            secureStorage.setRefreshToken(newRefreshToken);
+            if (DEBUG) console.log('✅ Token refresh successful');
+            
+            // Retry the original request with new token
+            const retryRequest = request.clone();
+            retryRequest.headers.set('Authorization', `Bearer ${accessToken}`);
+            
+            if (DEBUG) console.log('🔄 Retrying original request with new token...');
+            return fetch(retryRequest);
+          }
+        } catch (refreshError) {
+          console.error('❌ Token refresh failed:', refreshError);
+          
+          // Clear tokens and redirect to login
+          secureStorage.clearAuthData();
+          if (typeof window !== 'undefined') {
+            window.location.href = AUTH_ROUTES.LOGIN;
           }
         }
-      } catch {
-        // Refresh failed, clear auth data and redirect to login
+      } else if (!refreshToken) {
+        console.warn('🚪 No refresh token available, redirecting to login');
         secureStorage.clearAuthData();
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          window.location.href = AUTH_ROUTES.LOGIN;
         }
       }
     }
+    
+    if (!response.ok && response.status !== 401) {
+      console.error(`❌ API Error: ${response.status} ${response.statusText} for ${request.url}`);
+    }
+    
     return response;
-  }
+  },
 });
 
 // Create a public client for authentication endpoints (no auth required)
@@ -110,7 +152,7 @@ export const api = {
       publicApiClient.POST('/api/v1/auth/refresh', { body }),
       
     getCurrentUser: () =>
-      apiClient.GET('/api/v1/users/me'),
+      apiClient.GET('/api/v1/auth/me'), // Fixed: was /api/v1/users/me
   },
 
   // Courses

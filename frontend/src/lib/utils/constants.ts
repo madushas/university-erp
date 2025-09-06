@@ -12,14 +12,27 @@ export const API_ROUTES = {
     LOGIN: '/api/v1/auth/login',
     REGISTER: '/api/v1/auth/register',
     REFRESH: '/api/v1/auth/refresh',
-    LOGOUT: '/api/v1/auth/logout',
-    ME: '/api/v1/users/me',
+    ME: '/api/v1/auth/me',
   },
   COURSES: '/api/v1/courses',
   REGISTRATIONS: '/api/v1/registrations',
   USERS: '/api/v1/users',
   ADMIN: '/api/v1/admin',
 };
+
+// Centralized app navigation routes
+export const NAV_ROUTES = {
+  HOME: '/',
+  LOGIN: AUTH_ROUTES.LOGIN,
+  REGISTER: AUTH_ROUTES.REGISTER,
+  DASHBOARD: AUTH_ROUTES.DASHBOARD,
+  COURSES: '/courses',
+  COURSES_MY: '/courses/my',
+  REGISTRATION: '/registration',
+  ACADEMIC_RECORDS: '/academic-records',
+  DEGREE_AUDIT: '/degree-audit',
+  PAYMENTS: '/payments',
+} as const;
 
 export const ROLES = {
   ADMIN: 'ADMIN',

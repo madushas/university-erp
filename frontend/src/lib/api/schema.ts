@@ -904,7 +904,7 @@ export interface paths {
         patch: operations["updateCourseStatus"];
         trace?: never;
     };
-    "/api/v1/users/me": {
+    "/api/v1/auth/me": {
         parameters: {
             query?: never;
             header?: never;

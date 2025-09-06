@@ -1,290 +1,232 @@
 import { api } from './generated';
+import type { paths } from '@/lib/api/schema';
+import { withErrorHandling, extractApiError } from '@/lib/utils/errorHandler';
+import { env } from '@/config/env';
+import { secureStorage } from '@/lib/utils/secureStorage';
 import type { 
   CourseDto, 
   CourseRequest, 
   CourseSearchParams, 
   CourseEnrollmentInfo,
-  CourseStatistics 
+  CourseStatistics,
+  PageCourseDto,
 } from '@/lib/types/course';
-import type { paths } from './schema';
-
-type SortableValue = string | number | undefined;
 
 /**
  * Enhanced Course API service with comprehensive course management functionality
  */
 export class CourseService {
   /**
-   * Get all courses with optional pagination
+   * Get all courses
    */
-  static async getAllCourses() {
-    const response = await api.courses.getAll();
-    if (!response.data) {
-      throw new Error('Failed to fetch courses');
-    }
-    return response.data || [];
+  static async getAllCourses(): Promise<CourseDto[]> {
+    return withErrorHandling(async () => {
+      const response = await api.courses.getAll();
+      const apiError = extractApiError(response);
+      if (apiError) throw apiError;
+      
+      if (!response.data) {
+        throw new Error('Failed to fetch courses');
+      }
+      return response.data || [];
+    }, 'CourseService.getAllCourses');
   }
 
   /**
-   * Get paginated courses with search and filtering
+   * Get paged courses directly from API (raw PageCourseDto)
    */
-  static async getPagedCourses(params: CourseSearchParams = {}) {
-    let allCourses: CourseDto[] = [];
+  static async getPagedCourses(params?: CourseSearchParams): Promise<PageCourseDto> {
+    return withErrorHandling(async () => {
+      const query = {
+        page: params?.page ?? 0,
+        size: params?.size ?? 10,
+        ...(params?.sortBy ? { sort: [`${params.sortBy},${params.sortDirection || 'asc'}`] } : {}),
+      } as Record<string, unknown>;
 
-    // If we have a title search, use the search endpoint
-    if (params.title) {
-      allCourses = await this.searchCourses(params.title);
-    } else {
-      // Get all courses for client-side filtering
-      allCourses = await this.getAllCourses();
-    }
+      const response = await api.courses.getPaged(query as never);
+      const apiError = extractApiError(response);
+      if (apiError) throw apiError;
 
-    // Apply client-side filters
-    let filteredCourses = allCourses;
-
-    if (params.code) {
-      filteredCourses = filteredCourses.filter(course => 
-        course.code?.toLowerCase().includes(params.code!.toLowerCase())
-      );
-    }
-
-    if (params.instructor) {
-      filteredCourses = filteredCourses.filter(course => 
-        course.instructor?.toLowerCase().includes(params.instructor!.toLowerCase())
-      );
-    }
-
-    if (params.department) {
-      filteredCourses = filteredCourses.filter(course => 
-        course.department?.toLowerCase().includes(params.department!.toLowerCase())
-      );
-    }
-
-    if (params.courseLevel) {
-      filteredCourses = filteredCourses.filter(course => course.courseLevel === params.courseLevel);
-    }
-
-    if (params.status) {
-      filteredCourses = filteredCourses.filter(course => course.status === params.status);
-    }
-
-    if (params.credits) {
-      filteredCourses = filteredCourses.filter(course => course.credits === params.credits);
-    }
-
-    // Apply sorting
-    const sortBy = params.sortBy || 'title';
-    const sortDirection = params.sortDirection || 'asc';
-
-    filteredCourses.sort((a, b) => {
-      let aValue: SortableValue = a[sortBy as keyof CourseDto] as SortableValue;
-      let bValue: SortableValue = b[sortBy as keyof CourseDto] as SortableValue;
-
-      // Handle null values
-      if (aValue == null && bValue == null) return 0;
-      if (aValue == null) return sortDirection === 'asc' ? -1 : 1;
-      if (bValue == null) return sortDirection === 'asc' ? 1 : -1;
-
-      // Convert strings to lowercase for case-insensitive comparison
-      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    // Apply pagination
-    const page = params.page || 0;
-    const size = params.size || 12;
-    const startIndex = page * size;
-    const endIndex = startIndex + size;
-    const paginatedCourses = filteredCourses.slice(startIndex, endIndex);
-
-    // Return in the expected PageCourseDto format
-    return {
-      content: paginatedCourses,
-      pageable: {
-        pageNumber: params.page || 0,
-        pageSize: params.size || 12,
-        sort: {
-          empty: false,
-          unsorted: false,
-          sorted: true
-        },
-        offset: (params.page || 0) * (params.size || 12),
-        paged: true,
-        unpaged: false
-      },
-      totalElements: filteredCourses.length,
-      totalPages: Math.ceil(filteredCourses.length / size),
-      last: endIndex >= filteredCourses.length,
-      first: page === 0,
-      numberOfElements: paginatedCourses.length,
-      size: size,
-      number: page,
-      sort: {
-        empty: false,
-        unsorted: false,
-        sorted: true
-      },
-      empty: paginatedCourses.length === 0
-    };
+      if (!response.data) {
+        throw new Error('Failed to fetch paged courses - no data returned');
+      }
+      return response.data;
+    }, 'CourseService.getPagedCourses');
   }
 
   /**
-   * Get course by ID
+   * Simple title search (hook compatibility)
    */
-  static async getCourseById(id: number): Promise<CourseDto> {
-    const response = await api.courses.getById(id);
-    if (!response.data) {
-      throw new Error('Course not found');
-    }
-    return response.data;
+  static async searchCoursesByTitle(title: string): Promise<CourseDto[]> {
+    return withErrorHandling(async () => {
+      const response = await api.courses.search(title);
+      const apiError = extractApiError(response);
+      if (apiError) throw apiError;
+      return response.data ?? [];
+    }, 'CourseService.searchCoursesByTitle');
   }
 
   /**
    * Get course by code
    */
   static async getCourseByCode(code: string): Promise<CourseDto> {
-    const response = await api.courses.getByCode(code);
-    if (!response.data) {
-      throw new Error('Course not found');
-    }
-    return response.data;
+    return withErrorHandling(async () => {
+      const response = await api.courses.getByCode(code);
+      const apiError = extractApiError(response);
+      if (apiError) throw apiError;
+      if (!response.data) throw new Error(`Course with code ${code} not found`);
+      return response.data;
+    }, 'CourseService.getCourseByCode');
   }
 
   /**
-   * Search courses by title
-   */
-  static async searchCourses(title: string): Promise<CourseDto[]> {
-    const response = await api.courses.search(title);
-    if (!response.data) {
-      throw new Error('Failed to search courses');
-    }
-    return response.data || [];
-  }
-
-  /**
-   * Get courses by instructor
+   * Get courses by instructor identifier (username or id as string as per backend)
    */
   static async getCoursesByInstructor(instructor: string): Promise<CourseDto[]> {
-    const response = await api.courses.getByInstructor(instructor);
-    if (!response.data) {
-      throw new Error('Failed to fetch instructor courses');
+    return withErrorHandling(async () => {
+      const response = await api.courses.getByInstructor(instructor);
+      const apiError = extractApiError(response);
+      if (apiError) throw apiError;
+      return response.data ?? [];
+    }, 'CourseService.getCoursesByInstructor');
+  }
+
+  /**
+   * Search courses - overloads
+   * - searchCourses(title: string) => CourseDto[]
+   * - searchCourses(params: CourseSearchParams) => paged result with filters
+   */
+  static async searchCourses(title: string): Promise<CourseDto[]>;
+  static async searchCourses(params: CourseSearchParams): Promise<{
+    courses: CourseDto[];
+    total: number;
+    page: number;
+    size: number;
+  }>;
+  static async searchCourses(param: string | CourseSearchParams): Promise<CourseDto[] | { courses: CourseDto[]; total: number; page: number; size: number }> {
+    if (typeof param === 'string') {
+      return this.searchCoursesByTitle(param);
     }
-    return response.data || [];
+
+    const params = param as CourseSearchParams;
+    return withErrorHandling(async () => {
+      console.log('🔍 CourseService.searchCourses called with:', params);
+      
+      // Build flat pagination parameters expected by Spring Pageable (page, size, sort)
+      const paginationParams = {
+        page: params.page ?? 0,
+        size: params.size ?? 10,
+        ...(params.sortBy ? { sort: [`${params.sortBy},${params.sortDirection || 'asc'}`] } : {}),
+      } as Record<string, unknown>;
+
+      console.log('🌐 Making paginated API call with params:', paginationParams);
+      const response = await api.courses.getPaged(paginationParams as never);
+      
+      // Apply minimal client-side filtering for now (until backend supports full filtering)
+      let filteredCourses = response.data?.content || [];
+      
+      if (params.title) {
+        filteredCourses = filteredCourses.filter(course => 
+          course.title?.toLowerCase().includes(params.title!.toLowerCase())
+        );
+      }
+      
+      if (params.code) {
+        filteredCourses = filteredCourses.filter(course => 
+          course.code?.toLowerCase().includes(params.code!.toLowerCase())
+        );
+      }
+      
+      if (params.instructor) {
+        filteredCourses = filteredCourses.filter(course => 
+          course.instructor?.toLowerCase().includes(params.instructor!.toLowerCase())
+        );
+      }
+      
+      if (params.department) {
+        filteredCourses = filteredCourses.filter(course => 
+          course.department?.toLowerCase().includes(params.department!.toLowerCase())
+        );
+      }
+      
+      if (params.status) {
+        filteredCourses = filteredCourses.filter(course => 
+          course.status === params.status
+        );
+      }
+      
+      if (params.credits) {
+        filteredCourses = filteredCourses.filter(course => 
+          course.credits === params.credits
+        );
+      }
+      
+      // Check for API errors
+      const apiError = extractApiError(response);
+      if (apiError) {
+        throw apiError;
+      }
+
+      if (!response.data) {
+        throw new Error('Failed to fetch paginated courses - no data returned');
+      }
+
+      console.log('✅ Paginated courses fetched successfully:', {
+        totalElements: response.data.totalElements,
+        totalPages: response.data.totalPages,
+        currentPage: response.data.number,
+        size: response.data.size,
+        filteredCount: filteredCourses.length
+      });
+
+      return {
+        courses: filteredCourses,
+        total: response.data.totalElements ?? filteredCourses.length,
+        page: response.data.number ?? 0,
+        size: response.data.size ?? (params.size ?? 10),
+      };
+    }, 'CourseService.searchCourses');
   }
 
   /**
-   * Get available courses for enrollment
+   * Get course by ID
    */
-  static async getAvailableCourses(): Promise<CourseDto[]> {
-    const response = await api.courses.getAvailable();
-    if (!response.data) {
-      throw new Error('Failed to fetch available courses');
-    }
-    return response.data || [];
+  static async getCourseById(id: number): Promise<CourseDto> {
+    return withErrorHandling(async () => {
+      const response = await api.courses.getById(id);
+      const apiError = extractApiError(response);
+      if (apiError) throw apiError;
+      
+      if (!response.data) {
+        throw new Error(`Course with ID ${id} not found`);
+      }
+      return response.data;
+    }, 'CourseService.getCourseById');
   }
 
   /**
-   * Create a new course
+   * Get courses for current instructor
    */
-  static async createCourse(courseData: CourseRequest): Promise<CourseDto> {
-    // Validate required fields
-    this.validateCourseData(courseData);
+  static async getMyCourses(): Promise<CourseDto[]> {
+    return withErrorHandling(async () => {
+      const url = `${env.API_URL}/api/v1/courses/my`;
+      const token = secureStorage.getAccessToken();
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+      });
 
-    // Transform time strings to LocalTime objects for API compatibility
-    const transformedData = this.transformCourseRequestForAPI(courseData);
-
-    const response = await api.courses.create(transformedData);
-    if (!response.data) {
-      throw new Error('Failed to create course - no data returned');
-    }
-    return response.data;
-  }
-
-  /**
-   * Update an existing course
-   */
-  static async updateCourse(id: number, courseData: CourseRequest): Promise<CourseDto> {
-    // Validate required fields
-    this.validateCourseData(courseData);
-
-    // Transform time strings to LocalTime objects for API compatibility
-    const transformedData = this.transformCourseRequestForAPI(courseData);
-
-    const response = await api.courses.update(id, transformedData);
-    if (!response.data) {
-      throw new Error('Failed to update course - no data returned');
-    }
-    return response.data;
-  }
-
-  /**
-   * Delete a course
-   */
-  static async deleteCourse(id: number): Promise<void> {
-    const response = await api.courses.delete(id);
-    if (response.error) {
-      throw new Error('Failed to delete course');
-    }
-  }
-
-  /**
-   * Get course enrollment information
-   */
-  static async getCourseEnrollmentInfo(courseId: number): Promise<CourseEnrollmentInfo> {
-    const course = await this.getCourseById(courseId);
-    const enrolledStudents = course.enrolledStudents || 0;
-    const maxStudents = course.maxStudents || 0;
-    const enrollmentPercentage = maxStudents > 0 ? (enrolledStudents / maxStudents) * 100 : 0;
-    
-    return {
-      courseId: course.id!,
-      courseName: course.title || '',
-      courseCode: course.code || '',
-      enrolledStudents,
-      maxStudents,
-      enrollmentPercentage,
-      canEnroll: enrolledStudents < maxStudents && course.status === 'ACTIVE',
-      enrollmentMessage: this.getEnrollmentMessage(enrolledStudents, maxStudents, course.status),
-    };
-  }
-
-  /**
-   * Get course statistics for analytics
-   */
-  static async getCourseStatistics(): Promise<CourseStatistics> {
-    const courses = await this.getAllCourses();
-    const activeCourses = courses.filter(course => course.status === 'ACTIVE');
-    const totalEnrollments = courses.reduce((sum, course) => sum + (course.enrolledStudents || 0), 0);
-    const averageEnrollmentRate = courses.length > 0 
-      ? courses.reduce((sum, course) => {
-          const rate = course.maxStudents && course.maxStudents > 0 
-            ? (course.enrolledStudents || 0) / course.maxStudents 
-            : 0;
-          return sum + rate;
-        }, 0) / courses.length * 100
-      : 0;
-
-    const topCourses = courses
-      .sort((a, b) => (b.enrolledStudents || 0) - (a.enrolledStudents || 0))
-      .slice(0, 5)
-      .map(course => ({
-        id: course.id!,
-        code: course.code || '',
-        title: course.title || '',
-        enrollmentCount: course.enrolledStudents || 0,
-      }));
-
-    return {
-      totalCourses: courses.length,
-      activeCourses: activeCourses.length,
-      totalEnrollments,
-      averageEnrollmentRate,
-      topCourses,
-    };
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Failed to fetch my courses: ${res.status}`);
+      }
+      const data = (await res.json()) as CourseDto[];
+      return data;
+    }, 'CourseService.getMyCourses');
   }
 
   /**
@@ -301,7 +243,7 @@ export class CourseService {
       errors.push('Course title is required');
     }
 
-    if (!courseData.instructor?.trim()) {
+    if (!courseData.instructorId) {
       errors.push('Instructor is required');
     }
 
@@ -333,6 +275,144 @@ export class CourseService {
     if (errors.length > 0) {
       throw new Error(errors.join(', '));
     }
+  }
+
+  /**
+   * Create a new course
+   */
+  static async createCourse(courseData: CourseRequest): Promise<CourseDto> {
+    return withErrorHandling(async () => {
+      console.log('🎯 CourseService.createCourse called with:', courseData);
+      
+      // Validate required fields
+      this.validateCourseData(courseData);
+      console.log('✅ Course data validation passed');
+      // Backend expects instructorId (Long) and LocalTime as "HH:mm:ss" strings per CourseRequest
+      // Send the request body as-is, assuming CourseForm formatted times correctly
+      const apiPayload = { ...courseData };
+      
+      const response = await api.courses.create(
+        apiPayload as unknown as paths['/api/v1/courses']['post']['requestBody']['content']['application/json']
+      );
+      
+      // Check for API errors
+      const apiError = extractApiError(response);
+      if (apiError) {
+        throw apiError;
+      }
+      
+      if (!response.data) {
+        throw new Error('Failed to create course - no data returned');
+      }
+      console.log('✅ Course created successfully:', response.data);
+      return response.data;
+    }, 'CourseService.createCourse');
+  }
+
+  /**
+   * Update an existing course
+   */
+  static async updateCourse(id: number, courseData: CourseRequest): Promise<CourseDto> {
+    return withErrorHandling(async () => {
+      // Validate required fields
+      this.validateCourseData(courseData);
+      
+      // Backend expects instructorId (Long) and LocalTime as "HH:mm:ss" strings per CourseRequest
+      const apiPayload = { ...courseData };
+      
+      const response = await api.courses.update(
+        id,
+        apiPayload as unknown as paths['/api/v1/courses/{id}']['put']['requestBody']['content']['application/json']
+      );
+      
+      // Check for API errors
+      const apiError = extractApiError(response);
+      if (apiError) {
+        throw apiError;
+      }
+      
+      if (!response.data) {
+        throw new Error('Failed to update course - no data returned');
+      }
+      return response.data;
+    }, 'CourseService.updateCourse');
+  }
+
+  /**
+   * Delete a course
+   */
+  static async deleteCourse(id: number): Promise<void> {
+    return withErrorHandling(async () => {
+      const response = await api.courses.delete(id);
+      
+      // Check for API errors
+      const apiError = extractApiError(response);
+      if (apiError) {
+        throw apiError;
+      }
+    }, 'CourseService.deleteCourse');
+  }
+
+  /**
+   * Get course enrollment information
+   */
+  static async getCourseEnrollmentInfo(courseId: number): Promise<CourseEnrollmentInfo> {
+    return withErrorHandling(async () => {
+      const course = await this.getCourseById(courseId);
+      
+      const enrolledCount = course.enrolledStudents || 0;
+      const maxCount = course.maxStudents || 0;
+      const enrollmentPercentage = maxCount > 0 ? (enrolledCount / maxCount) * 100 : 0;
+      const canEnroll = course.status === 'ACTIVE' && enrolledCount < maxCount;
+
+      return {
+        courseId: course.id!,
+        courseName: course.title || '',
+        courseCode: course.code || '',
+        enrolledStudents: enrolledCount,
+        maxStudents: maxCount,
+        enrollmentPercentage,
+        canEnroll,
+        enrollmentMessage: this.getEnrollmentMessage(enrolledCount, maxCount, course.status)
+      };
+    }, 'CourseService.getCourseEnrollmentInfo');
+  }
+
+  /**
+   * Get course statistics for analytics
+   */
+  static async getCourseStatistics(): Promise<CourseStatistics> {
+    return withErrorHandling(async () => {
+      const courses = await this.getAllCourses();
+      const activeCourses = courses.filter(course => course.status === 'ACTIVE');
+      const totalEnrollments = courses.reduce((sum, course) => sum + (course.enrolledStudents || 0), 0);
+      const averageEnrollmentRate = courses.length > 0 
+        ? courses.reduce((sum, course) => {
+            const rate = course.maxStudents && course.maxStudents > 0 
+              ? (course.enrolledStudents || 0) / course.maxStudents 
+              : 0;
+            return sum + rate;
+          }, 0) / courses.length * 100
+        : 0;
+
+      const topCourses = courses
+        .sort((a, b) => (b.enrolledStudents || 0) - (a.enrolledStudents || 0))
+        .slice(0, 5)
+        .map(course => ({
+          id: course.id!,
+          code: course.code || '',
+          title: course.title || '',
+          enrollmentCount: course.enrolledStudents || 0,
+        }));
+
+      return {
+        totalCourses: courses.length,
+        activeCourses: activeCourses.length,
+        totalEnrollments,
+        averageEnrollmentRate,
+        topCourses,
+      };
+    }, 'CourseService.getCourseStatistics');
   }
 
   /**
@@ -369,33 +449,6 @@ export class CourseService {
   private static isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
-  }
-
-  /**
-   * Transform CourseRequest data to match the API client's expected LocalTime format
-   */
-  private static transformCourseRequestForAPI(courseData: CourseRequest): paths['/api/v1/courses']['post']['requestBody']['content']['application/json'] {
-    const parseTimeString = (timeString: string | undefined) => {
-      if (!timeString) return undefined;
-      
-      // Parse HH:mm:ss format
-      const parts = timeString.split(':');
-      if (parts.length >= 2) {
-        return {
-          hour: parseInt(parts[0], 10),
-          minute: parseInt(parts[1], 10),
-          second: parts.length > 2 ? parseInt(parts[2], 10) : 0,
-          nano: 0
-        };
-      }
-      return undefined;
-    };
-
-    return {
-      ...courseData,
-      startTime: parseTimeString(courseData.startTime),
-      endTime: parseTimeString(courseData.endTime)
-    };
   }
 }
 

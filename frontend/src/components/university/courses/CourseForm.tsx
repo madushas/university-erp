@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { InstructorSelect } from '@/components/ui/InstructorSelect';
 import type { CourseDto, CourseRequest, CourseFormData, CourseLevel, CourseStatus } from '@/lib/types/course';
 
 interface CourseFormProps {
@@ -51,7 +52,7 @@ export default function CourseForm({
     code: '',
     title: '',
     description: '',
-    instructor: '',
+    instructorId: null,
     instructorEmail: '',
     department: '',
     courseLevel: 'UNDERGRADUATE',
@@ -76,6 +77,32 @@ export default function CourseForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
 
+  // Helper function to parse time string or LocalTime object to time object
+  const parseTimeString = (timeInput: string | { hour?: number; minute?: number; second?: number; nano?: number } | undefined) => {
+    if (!timeInput) return { hour: 9, minute: 0 };
+    
+    // If it's already a LocalTime object
+    if (typeof timeInput === 'object' && 'hour' in timeInput) {
+      return {
+        hour: timeInput.hour ?? 9,
+        minute: timeInput.minute ?? 0
+      };
+    }
+    
+    // If it's a string, parse it
+    if (typeof timeInput === 'string') {
+      const parts = timeInput.split(':');
+      if (parts.length >= 2) {
+        return {
+          hour: parseInt(parts[0], 10),
+          minute: parseInt(parts[1], 10)
+        };
+      }
+    }
+    
+    return { hour: 9, minute: 0 };
+  };
+
   // Initialize form with course data if editing
   useEffect(() => {
     if (course && mode === 'edit') {
@@ -83,7 +110,7 @@ export default function CourseForm({
         code: course.code || '',
         title: course.title || '',
         description: course.description || '',
-        instructor: course.instructor || '',
+        instructorId: course && 'instructorId' in course ? (course.instructorId ?? null) : null,
         instructorEmail: course.instructorEmail || '',
         department: course.department || '',
         courseLevel: (course.courseLevel as CourseLevel) || 'UNDERGRADUATE',
@@ -91,19 +118,13 @@ export default function CourseForm({
         classroom: course.classroom || '',
         startDate: course.startDate || '',
         endDate: course.endDate || '',
-        startTime: course.startTime ? {
-          hour: course.startTime.hour || 9,
-          minute: course.startTime.minute || 0
-        } : { hour: 9, minute: 0 },
-        endTime: course.endTime ? {
-          hour: course.endTime.hour || 10,
-          minute: course.endTime.minute || 30
-        } : { hour: 10, minute: 30 },
+        startTime: course.startTime ? parseTimeString(course.startTime) : { hour: 9, minute: 0 },
+        endTime: course.endTime ? parseTimeString(course.endTime) : { hour: 10, minute: 30 },
         daysOfWeek: course.daysOfWeek || '',
         credits: course.credits || 3,
         maxStudents: course.maxStudents || 30,
         minStudents: course.minStudents || 5,
-        courseFee: course.courseFee || 0,
+        courseFee: course.courseFee || undefined,
         prerequisites: course.prerequisites || '',
         status: course.status || 'DRAFT',
         syllabusUrl: course.syllabusUrl || '',
@@ -145,7 +166,7 @@ export default function CourseForm({
     setSelectedDays(newSelectedDays);
     setFormData(prev => ({
       ...prev,
-      daysOfWeek: newSelectedDays.join(', ')
+      daysOfWeek: newSelectedDays.join(',')
     }));
   };
 
@@ -160,8 +181,8 @@ export default function CourseForm({
       newErrors.title = 'Course title is required';
     }
 
-    if (!formData.instructor.trim()) {
-      newErrors.instructor = 'Instructor is required';
+    if (!formData.instructorId) {
+      newErrors.instructorId = 'Instructor is required';
     }
 
     if (!formData.schedule.trim()) {
@@ -189,6 +210,14 @@ export default function CourseForm({
       newErrors.instructorEmail = 'Invalid email format';
     }
 
+    if (!formData.startDate) {
+      newErrors.startDate = 'Start Date is required';
+    }
+
+    if (!formData.endDate) {
+      newErrors.endDate = 'End Date is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -213,11 +242,18 @@ export default function CourseForm({
         return `${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}:00`;
       };
 
+      console.log('📝 Submitting course form data:', {
+        mode,
+        instructorId: formData.instructorId,
+        code: formData.code,
+        title: formData.title
+      });
+
       const courseRequest: CourseRequest = {
         code: formData.code,
         title: formData.title,
         description: formData.description || '',
-        instructor: formData.instructor,
+        instructorId: formData.instructorId!,
         instructorEmail: formData.instructorEmail || '',
         department: formData.department || '',
         courseLevel: formData.courseLevel,
@@ -231,7 +267,7 @@ export default function CourseForm({
         credits: formData.credits,
         maxStudents: formData.maxStudents || 30,
         minStudents: formData.minStudents || 5,
-        courseFee: formData.courseFee || 0,
+        courseFee: formData.courseFee ? formData.courseFee : undefined,
         prerequisites: formData.prerequisites || '',
         status: formData.status,
         syllabusUrl: formData.syllabusUrl || '',
@@ -239,9 +275,11 @@ export default function CourseForm({
         passingGrade: formData.passingGrade || 'C'
       };
 
+      console.log('🚀 Final course request:', courseRequest);
       await onSubmit(courseRequest);
     } catch (error) {
       console.error('Form submission error:', error);
+      throw error; // Re-throw to let parent handle the error
     }
   };
 
@@ -305,16 +343,24 @@ export default function CourseForm({
         {/* Instructor Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Instructor *
             </label>
-            <Input
-              value={formData.instructor}
-              onChange={(e) => handleInputChange('instructor', e.target.value)}
-              placeholder="Instructor name"
-              className={errors.instructor ? 'border-red-500' : ''}
+            <InstructorSelect
+              value={formData.instructorId}
+              onChange={(instructorId, instructor) => {
+                setFormData(prev => ({
+                  ...prev,
+                  instructorId,
+                  instructorEmail: instructor?.email || ''
+                }));
+              }}
+              placeholder="Select an instructor..."
+              disabled={loading}
+              error={errors.instructorId}
+              required
             />
-            {errors.instructor && <p className="text-red-500 text-sm mt-1">{errors.instructor}</p>}
+            {errors.instructorId && <p className="text-red-500 text-sm mt-1">{errors.instructorId}</p>}
           </div>
 
           <div>
@@ -353,6 +399,7 @@ export default function CourseForm({
               value={formData.courseLevel}
               onChange={(e) => handleInputChange('courseLevel', e.target.value as CourseLevel)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Course Level"
             >
               {COURSE_LEVELS.map(level => (
                 <option key={level.value} value={level.value}>
@@ -402,6 +449,32 @@ export default function CourseForm({
               onChange={(e) => handleInputChange('classroom', e.target.value)}
               placeholder="e.g., Room 101"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date *
+            </label>
+            <Input
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => handleInputChange('startDate', e.target.value)}
+              className={errors.startDate ? 'border-red-500' : ''}
+            />
+            {errors.startDate && <p className="text-red-500 text-sm mt-1">{errors.startDate}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Date *
+            </label>
+            <Input
+              type="date"
+              value={formData.endDate}
+              onChange={(e) => handleInputChange('endDate', e.target.value)}
+              className={errors.endDate ? 'border-red-500' : ''}
+            />
+            {errors.endDate && <p className="text-red-500 text-sm mt-1">{errors.endDate}</p>}
           </div>
         </div>
 
@@ -578,6 +651,7 @@ export default function CourseForm({
               value={formData.status}
               onChange={(e) => handleInputChange('status', e.target.value as CourseStatus)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Course Status"
             >
               {COURSE_STATUSES.map(status => (
                 <option key={status.value} value={status.value}>

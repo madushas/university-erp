@@ -1,5 +1,6 @@
 import { jwtDecode } from 'jwt-decode';
 import { JWTPayload } from '@/lib/types/auth';
+import { secureStorage } from '@/lib/utils/secureStorage';
 
 export const decodeToken = (token: string): JWTPayload | null => {
   try {
@@ -23,32 +24,43 @@ export const getTokenExpirationTime = (token: string): number | null => {
 };
 
 export const hasRole = (token: string, role: string): boolean => {
-  // For now, we'll get the role from localStorage user data
-  // since the JWT doesn't contain role information
+  // Get the role from secure storage user data
   if (typeof window === 'undefined') return false;
   
+  const user = secureStorage.getUser();
+  if (user && user.role) {
+    return user.role === role;
+  }
+  // Fallback to localStorage for backward compatibility
   try {
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem('uni_user_data');
     if (userData) {
-      const user = JSON.parse(userData);
-      return user.role === role;
+      const storageItem = JSON.parse(userData);
+      const legacyUser = storageItem.value;
+      return legacyUser.role === role;
     }
   } catch {
-    // JWT doesn't contain role information, so no fallback available
+    // ignore
   }
   
   return false;
 };
 
 export const getUserIdFromToken = (token: string): string | null => {
-  // Get user ID from localStorage user data
+  // Get user ID from secure storage user data
   if (typeof window === 'undefined') return null;
   
+  const user = secureStorage.getUser();
+  if (user && user.id) {
+    return user.id.toString();
+  }
+  // Fallback to localStorage for backward compatibility
   try {
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem('uni_user_data');
     if (userData) {
-      const user = JSON.parse(userData);
-      return user.id?.toString() || null;
+      const storageItem = JSON.parse(userData);
+      const legacyUser = storageItem.value;
+      return legacyUser.id?.toString() || null;
     }
   } catch {
     // Fallback to JWT sub claim

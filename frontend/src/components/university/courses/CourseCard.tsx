@@ -83,7 +83,7 @@ export default function CourseCard({
             <div>
               <p className="text-sm text-gray-500">Instructor</p>
               <p className="text-sm font-medium text-gray-900">
-                {course.instructor || 'TBA'}
+                {course.instructorName || 'TBA'}
               </p>
             </div>
 
@@ -230,7 +230,7 @@ export default function CourseCard({
       <div className="space-y-2 text-sm text-gray-500 mb-4">
         <div className="flex justify-between">
           <span className="font-medium">Instructor:</span>
-          <span className="text-gray-900">{course.instructor || 'TBA'}</span>
+          <span className="text-gray-900">{course.instructorName || 'TBA'}</span>
         </div>
         <div className="flex justify-between">
           <span className="font-medium">Credits:</span>

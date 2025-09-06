@@ -20,6 +20,7 @@ interface AuthContextType extends AuthState {
   register: (data: RegisterRequest) => Promise<void>;
   refreshAuth: () => Promise<void>;
   clearError: () => void;
+  setUser: (user: User | null) => void;
 }
 
 type AuthAction =
@@ -160,6 +161,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
+  const setUser = (user: User | null) => {
+    dispatch({ type: 'SET_USER', payload: user });
+  };
+
   // Check auth on mount - but skip if we have stored auth data
   useEffect(() => {
     const storedToken = secureStorage.getAccessToken();
@@ -184,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register,
     refreshAuth,
     clearError,
+    setUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

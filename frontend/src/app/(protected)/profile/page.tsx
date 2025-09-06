@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
+import { updateUserProfile } from '@/lib/api/users';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,16 +34,37 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ProfileFormData>({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    phone: '', // Initialize as empty since it's not in User type
-    address: '', // Initialize as empty since it's not in User type
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
   });
 
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: '', // User object doesn't have phone field
+        address: '', // User object doesn't have address field
+      });
+    }
+  }, [user]);
+
   const handleSave = async () => {
+    if (!user?.id) return;
+
     try {
-      // TODO: Implement profile update API call
+      await updateUserProfile(user.id.toString(), {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+      });
+      // Note: setUser is not available in useAuth, would need to refresh auth
       toast.success('Profile updated successfully');
       setIsEditing(false);
     } catch {
@@ -51,13 +73,15 @@ export default function ProfilePage() {
   };
 
   const handleCancel = () => {
-    setFormData({
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-      email: user?.email || '',
-      phone: '', // Reset to empty since it's not in User type
-      address: '', // Reset to empty since it's not in User type
-    });
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: '', // User object doesn't have phone field
+        address: '', // User object doesn't have address field
+      });
+    }
     setIsEditing(false);
   };
 
@@ -112,12 +136,14 @@ export default function ProfilePage() {
                   {user?.firstName} {user?.lastName}
                 </CardTitle>
                 <div className="flex items-center justify-center space-x-2 mt-2">
-                  <Badge className={getRoleColor(user?.role || 'STUDENT')}>
-                    <div className="flex items-center space-x-1">
-                      {getRoleIcon(user?.role || 'STUDENT')}
-                      <span>{user?.role || 'STUDENT'}</span>
-                    </div>
-                  </Badge>
+                  {user?.role && (
+                    <Badge className={getRoleColor(user.role)}>
+                      <div className="flex items-center space-x-1">
+                        {getRoleIcon(user.role)}
+                        <span>{user.role}</span>
+                      </div>
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -129,7 +155,7 @@ export default function ProfilePage() {
                   <div className="flex items-center space-x-3 text-sm">
                     <Calendar className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-600">
-                      Member since {new Date().getFullYear()}
+                      Member since {user?.createdAt ? new Date(user.createdAt).getFullYear() : new Date().getFullYear()}
                     </span>
                   </div>
                   {user?.studentId && (
@@ -299,12 +325,14 @@ export default function ProfilePage() {
                     Role
                   </label>
                   <div className="py-2">
-                    <Badge className={getRoleColor(user?.role || 'STUDENT')}>
-                      <div className="flex items-center space-x-1">
-                        {getRoleIcon(user?.role || 'STUDENT')}
-                        <span>{user?.role || 'STUDENT'}</span>
-                      </div>
-                    </Badge>
+                    {user?.role && (
+                      <Badge className={getRoleColor(user.role)}>
+                        <div className="flex items-center space-x-1">
+                          {getRoleIcon(user.role)}
+                          <span>{user.role}</span>
+                        </div>
+                      </Badge>
+                    )}
                     <span className="text-xs text-gray-500 ml-2">(Cannot be changed)</span>
                   </div>
                 </div>

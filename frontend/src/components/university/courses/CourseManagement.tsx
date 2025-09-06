@@ -1,56 +1,116 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCourses } from '@/lib/hooks/useCourses';
 import { useRoleAccess } from '@/lib/hooks/useRoleAccess';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { toast } from 'sonner';
 import CourseList from './CourseList';
 import CourseDetails from './CourseDetails';
 import CourseForm from './CourseForm';
 import type { CourseDto, CourseRequest } from '@/lib/types/course';
+import { NAV_ROUTES } from '@/lib/utils/constants';
 
 type ViewMode = 'list' | 'details' | 'create' | 'edit';
 
 export default function CourseManagement() {
+  const router = useRouter();
   const { canManageCourses, isStudent, isInstructor } = useRoleAccess();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedCourse, setSelectedCourse] = useState<CourseDto | null>(null);
-  const { statistics, loadStatistics, createCourse, updateCourse } = useCourses({ autoLoad: false });
+  const { statistics, loading, courses, loadStatistics, createCourse, updateCourse, deleteCourse, loadPagedCourses } = useCourses({ autoLoad: false });
 
   const canManage = canManageCourses();
   const isStudentUser = isStudent();
   const isInstructorUser = isInstructor();
 
   const handleCourseSelect = (course: CourseDto) => {
+    // Navigate to the unified dedicated route instead of inline details
+    if (course.id) {
+      router.push(`/course/${course.id}`);
+      return;
+    }
+    // Fallback (should rarely happen)
     setSelectedCourse(course);
     setViewMode('details');
   };
 
-  const handleCreateCourse = async (courseData: CourseRequest) => {
+  const handleDeleteCourse = async (id: number) => {
+    if (!id) return;
     try {
-      await createCourse(courseData);
-      setViewMode('list');
-      // Show success message
+      const confirmed = typeof window !== 'undefined' ? window.confirm('Are you sure you want to delete this course?') : true;
+      if (!confirmed) return;
+      const ok = await deleteCourse(id);
+      if (ok) {
+        toast.success('Course deleted successfully!');
+        if (selectedCourse?.id === id) {
+          setSelectedCourse(null);
+          setViewMode('list');
+        }
+        if (canManageCourses()) {
+          loadPagedCourses();
+        }
+      } else {
+        toast.error('Failed to delete course');
+      }
     } catch (error) {
-      console.error('Failed to create course:', error);
-      // Show error message
+      console.error('Failed to delete course:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete course';
+      toast.error(`Error deleting course: ${errorMessage}`);
+    }
+  };
+
+  const handleEditCourseFromList = (course: CourseDto) => {
+    setSelectedCourse(course);
+    setViewMode('edit');
+  };
+
+  const handleCreateCourse = async (courseData: CourseRequest) => {
+    console.log('🚀 handleCreateCourse called with data:', courseData);
+    try {
+      console.log('📞 Calling createCourse API...');
+      const newCourse = await createCourse(courseData);
+      console.log('✅ createCourse API response:', newCourse);
+      if (newCourse) {
+        toast.success('Course created successfully!');
+        setViewMode('list');
+        // Refresh the course list
+        if (canManageCourses()) {
+          loadPagedCourses();
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to create course:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create course';
+      toast.error(`Error creating course: ${errorMessage}`);
     }
   };
 
   const handleUpdateCourse = async (courseData: CourseRequest) => {
-    if (!selectedCourse?.id) return;
+    if (!selectedCourse?.id) {
+      toast.error('No course selected for update');
+      return;
+    }
     
     try {
       const updatedCourse = await updateCourse(selectedCourse.id, courseData);
       if (updatedCourse) {
         setSelectedCourse(updatedCourse);
+        toast.success('Course updated successfully!');
+        setViewMode('details');
+        // Refresh the course list
+        if (canManageCourses()) {
+          loadPagedCourses();
+        }
       }
-      setViewMode('details');
-      // Show success message
     } catch (error) {
       console.error('Failed to update course:', error);
-      // Show error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update course';
+      toast.error(`Error updating course: ${errorMessage}`);
     }
   };
 
@@ -70,8 +130,34 @@ export default function CourseManagement() {
 
   // Load statistics when component mounts
   useEffect(() => {
-    loadStatistics();
-  }, [loadStatistics]);
+    // Import auth debug utility
+    import('@/lib/utils/authDebug').then(({ logAuthDebug }) => {
+      logAuthDebug('CourseManagement Component');
+    });
+
+    console.log('🔄 CourseManagement useEffect triggered', {
+      isInstructorUser,
+      userRole: user?.role,
+      isStudent: isStudentUser,
+      canManageCourses: canManage,
+    });
+
+    if (isInstructorUser) {
+      console.log('👨‍🏫 Instructor: loading all courses for browse and statistics');
+      // Instructors can browse ALL courses on /courses
+      loadStatistics();
+      loadPagedCourses();
+    } else if (isStudentUser) {
+      console.log('🎓 Loading all courses for student');
+      loadPagedCourses(); // Load all courses for students to browse
+    } else if (canManage) { // For admins
+      console.log('📊 Loading all courses and statistics for admin');
+      loadStatistics();
+      loadPagedCourses(); // Admins should see all courses
+    } else {
+      console.warn('⚠️ No matching role condition for course loading');
+    }
+  }, [isInstructorUser, isStudentUser, canManage, loadPagedCourses, loadStatistics, user?.role]);
 
   return (
     <div className="space-y-6">
@@ -166,8 +252,13 @@ export default function CourseManagement() {
 
       {/* Main Content */}
       {viewMode === 'list' && (
-        <CourseList
+        <CourseList 
+          courses={courses}
+          loading={loading} 
           onCourseSelect={handleCourseSelect}
+          onEdit={canManage ? handleEditCourseFromList : undefined}
+          onDelete={canManage ? handleDeleteCourse : undefined}
+          onAddNew={canManage ? () => setViewMode('create') : undefined}
           searchable={true}
           filterable={true}
         />
@@ -187,6 +278,7 @@ export default function CourseManagement() {
           mode="create"
           onSubmit={handleCreateCourse}
           onCancel={handleBackToList}
+          loading={loading}
         />
       )}
 
@@ -196,6 +288,7 @@ export default function CourseManagement() {
           mode="edit"
           onSubmit={handleUpdateCourse}
           onCancel={() => setViewMode('details')}
+          loading={loading}
         />
       )}
 
@@ -217,8 +310,7 @@ export default function CourseManagement() {
               variant="outline"
               className="shadow-lg bg-white"
               onClick={() => {
-                // TODO: Navigate to my courses
-                console.log('Navigate to my courses');
+                router.push(NAV_ROUTES.COURSES_MY);
               }}
             >
               My Courses
@@ -230,8 +322,7 @@ export default function CourseManagement() {
               variant="outline"
               className="shadow-lg bg-white"
               onClick={() => {
-                // TODO: Navigate to instructor dashboard
-                console.log('Navigate to instructor dashboard');
+                router.push(NAV_ROUTES.COURSES_MY);
               }}
             >
               My Classes

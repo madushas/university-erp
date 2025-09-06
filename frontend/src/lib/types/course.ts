@@ -1,7 +1,12 @@
 import type { components } from '@/lib/api/schema';
 
-// Course types from the API schema
-export type CourseDto = components['schemas']['CourseDto'];
+// Course types from the API schema with instructor field extensions
+export interface CourseDto extends Omit<components['schemas']['CourseDto'], 'instructor'> {
+  instructorName?: string;
+  instructorId?: number;
+  instructor?: string; // Keep for backward compatibility
+}
+
 export type CourseResponse = components['schemas']['CourseResponse'];
 export type PageCourseDto = components['schemas']['PageCourseDto'];
 
@@ -34,7 +39,7 @@ export interface CourseFormData {
   code: string;
   title: string;
   description?: string;
-  instructor: string;
+  instructorId: number | null;
   instructorEmail?: string;
   department?: string;
   courseLevel?: CourseLevel;
@@ -68,7 +73,7 @@ export interface CourseRequest {
   code: string;
   title: string;
   description?: string;
-  instructor: string;
+  instructorId: number;
   instructorEmail?: string;
   department?: string;
   courseLevel?: CourseLevel;
