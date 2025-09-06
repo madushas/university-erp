@@ -21,8 +21,9 @@ export const useAuth = () => {
     return token ? hasRole(token, role) : false;
   };
 
-  const isAdmin = (): boolean => checkRole('ROLE_ADMIN');
-  const isStudent = (): boolean => checkRole('ROLE_STUDENT');
+  const isAdmin = (): boolean => checkRole('ADMIN');
+  const isStudent = (): boolean => checkRole('STUDENT');
+  const isInstructor = (): boolean => checkRole('INSTRUCTOR');
 
   return {
     user,
@@ -35,6 +36,7 @@ export const useAuth = () => {
     checkRole,
     isAdmin,
     isStudent,
+    isInstructor,
     refreshAuth,
   };
 };

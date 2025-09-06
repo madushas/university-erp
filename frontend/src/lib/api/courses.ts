@@ -1,8 +1,6 @@
 import { api } from './generated';
 import type { paths } from '@/lib/api/schema';
 import { withErrorHandling, extractApiError } from '@/lib/utils/errorHandler';
-import { env } from '@/config/env';
-import { secureStorage } from '@/lib/utils/secureStorage';
 import type { 
   CourseDto, 
   CourseRequest, 
@@ -138,9 +136,11 @@ export class CourseService {
       }
       
       if (params.instructor) {
-        filteredCourses = filteredCourses.filter(course => 
-          course.instructor?.toLowerCase().includes(params.instructor!.toLowerCase())
-        );
+        filteredCourses = filteredCourses.filter(course => {
+          const c = course as unknown as { instructorName?: string; instructor?: string };
+          const name = (c.instructorName || c.instructor || '').toLowerCase();
+          return name.includes(params.instructor!.toLowerCase());
+        });
       }
       
       if (params.department) {
@@ -209,23 +209,13 @@ export class CourseService {
    */
   static async getMyCourses(): Promise<CourseDto[]> {
     return withErrorHandling(async () => {
-      const url = `${env.API_URL}/api/v1/courses/my`;
-      const token = secureStorage.getAccessToken();
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Failed to fetch my courses: ${res.status}`);
+      const response = await api.courses.my();
+      const apiError = extractApiError(response);
+      if (apiError) throw apiError;
+      if (!response.data) {
+        throw new Error('Failed to fetch my courses');
       }
-      const data = (await res.json()) as CourseDto[];
-      return data;
+      return response.data as unknown as CourseDto[];
     }, 'CourseService.getMyCourses');
   }
 

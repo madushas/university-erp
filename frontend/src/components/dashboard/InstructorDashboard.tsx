@@ -7,41 +7,36 @@ import { Button } from '@/components/ui/button';
 import { 
   BookOpen, 
   Users, 
-  ClipboardList, 
-  TrendingUp, 
-  Calendar,
-  FileText,
   AlertCircle,
-  Clock,
   GraduationCap
 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { CourseService } from '@/lib/api/courses';
+import type { CourseDto } from '@/lib/types/course';
+import { RegistrationService } from '@/lib/api/registrations';
+import type { RegistrationDto } from '@/lib/types/registration';
 
 interface InstructorDashboardData {
   assignedCourses: number;
   totalStudents: number;
-  pendingGrades: number;
-  upcomingClasses: number;
   courseList: Array<{
-    id: string;
+    id: number;
     code: string;
-    name: string;
+    title: string;
     enrolledStudents: number;
-    capacity: number;
+    maxStudents: number;
     schedule: string;
-  }>;
-  recentActivity: Array<{
-    id: string;
-    type: 'enrollment' | 'grade' | 'assignment';
-    message: string;
-    timestamp: string;
+    classroom?: string;
+    daysOfWeek?: string | null;
+    startTime?: unknown;
+    endTime?: unknown;
   }>;
   gradingTasks: Array<{
+    courseId: number;
     courseCode: string;
-    courseName: string;
+    courseTitle: string;
     pendingCount: number;
-    dueDate: string;
   }>;
 }
 
@@ -55,79 +50,64 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // For testing purposes, allow forcing an error
       const forceErrorActive = typeof window !== 'undefined' && 
         (window.location.search.includes('forceError=true') || 
          localStorage.getItem('forceDashboardError') === 'true');
-      
       if (forceErrorActive || forceError) {
         throw new Error('Forced error for testing');
       }
-      
-      // Mock data for now - replace with actual API call
-      const mockData: InstructorDashboardData = {
-        assignedCourses: 3,
-        totalStudents: 85,
-        pendingGrades: 12,
-        upcomingClasses: 5,
-        courseList: [
-          {
-            id: '1',
-            code: 'CS101',
-            name: 'Introduction to Computer Science',
-            enrolledStudents: 28,
-            capacity: 30,
-            schedule: 'MWF 10:00-11:00'
-          },
-          {
-            id: '2',
-            code: 'CS201',
-            name: 'Data Structures',
-            enrolledStudents: 25,
-            capacity: 25,
-            schedule: 'TTh 14:00-15:30'
-          },
-          {
-            id: '3',
-            code: 'CS301',
-            name: 'Algorithms',
-            enrolledStudents: 32,
-            capacity: 35,
-            schedule: 'MWF 13:00-14:00'
-          }
-        ],
-        recentActivity: [
-          {
-            id: '1',
-            type: 'enrollment',
-            message: 'New student enrolled in CS101',
-            timestamp: '2024-01-15T10:30:00Z'
-          },
-          {
-            id: '2',
-            type: 'grade',
-            message: 'Assignment grades submitted for CS201',
-            timestamp: '2024-01-14T16:45:00Z'
-          }
-        ],
-        gradingTasks: [
-          {
-            courseCode: 'CS101',
-            courseName: 'Introduction to Computer Science',
-            pendingCount: 5,
-            dueDate: '2024-02-20'
-          },
-          {
-            courseCode: 'CS301',
-            courseName: 'Algorithms',
-            pendingCount: 7,
-            dueDate: '2024-02-22'
-          }
-        ]
-      };
 
-      setDashboardData(mockData);
+      const courses: CourseDto[] = await CourseService.getMyCourses();
+      const courseList = courses.map((c) => {
+        const ci = c as unknown as {
+          daysOfWeek?: string | null;
+          startTime?: unknown;
+          endTime?: unknown;
+          classroom?: string;
+        };
+        return {
+          id: c.id!,
+          code: c.code || '',
+          title: c.title || '',
+          enrolledStudents: c.enrolledStudents || 0,
+          maxStudents: c.maxStudents || 0,
+          schedule: c.schedule || '',
+          classroom: ci.classroom,
+          daysOfWeek: ci.daysOfWeek ?? null,
+          startTime: ci.startTime,
+          endTime: ci.endTime,
+        };
+      });
+
+      const totalStudents = courseList.reduce((sum, c) => sum + (c.enrolledStudents || 0), 0);
+
+      // Fetch registrations for each course to compute grading tasks
+      const regsByCourse: Array<{ course: typeof courseList[number]; regs: RegistrationDto[] }> = await Promise.all(
+        courseList.map(async (c) => ({ course: c, regs: await RegistrationService.getCourseRegistrations(c.id) }))
+      );
+      const gradingTasks = regsByCourse.map(({ course, regs }) => {
+        const pending = (regs || []).filter((r) => {
+          const rr = r as unknown as { grade?: string; status?: string };
+          const grade = rr.grade;
+          const status = rr.status;
+          return (!grade || grade.trim() === '') && (status === 'COMPLETED' || status === 'ENROLLED');
+        }).length;
+        return {
+          courseId: course.id,
+          courseCode: course.code,
+          courseTitle: course.title,
+          pendingCount: pending,
+        };
+      }).filter(t => t.pendingCount > 0)
+        .sort((a,b) => b.pendingCount - a.pendingCount)
+        .slice(0, 5);
+
+      setDashboardData({
+        assignedCourses: courseList.length,
+        totalStudents,
+        courseList,
+        gradingTasks,
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -144,7 +124,7 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
     return (
       <div className="space-y-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+          {[...Array(2)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div className="h-4 bg-gray-200 rounded w-24"></div>
@@ -182,11 +162,52 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
   }
 
   const getEnrollmentStatus = (enrolled: number, capacity: number) => {
+    if (!capacity || capacity <= 0) return { color: 'text-gray-600', status: 'N/A' };
     const percentage = (enrolled / capacity) * 100;
-    if (percentage >= 90) return { color: 'text-red-600', status: 'Full' };
+    if (percentage >= 100) return { color: 'text-red-600', status: 'Full' };
     if (percentage >= 75) return { color: 'text-yellow-600', status: 'High' };
     return { color: 'text-green-600', status: 'Available' };
   };
+
+  // Helpers for today's classes
+  const todayName = (() => {
+    const d = new Date();
+    const names = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+    return names[d.getDay()];
+  })();
+
+  const hasClassToday = (daysOfWeek?: string | null): boolean => {
+    if (!daysOfWeek) return false;
+    return daysOfWeek.split(',').map(s => s.trim().toUpperCase()).includes(todayName);
+  };
+
+  const formatTime = (time: unknown): string | null => {
+    if (!time) return null;
+    if (typeof time === 'string') return time.substring(0,5);
+    const isTimeObj = (val: unknown): val is { hour?: number; minute?: number } => (
+      typeof val === 'object' && val !== null && 'hour' in (val as Record<string, unknown>)
+    );
+    if (isTimeObj(time)) {
+      const hh = String(time.hour ?? 0).padStart(2,'0');
+      const mm = String(time.minute ?? 0).padStart(2,'0');
+      return `${hh}:${mm}`;
+    }
+    return null;
+  };
+
+  const todaysClasses = (dashboardData?.courseList || [])
+    .filter(c => hasClassToday(c.daysOfWeek))
+    .slice(0, 5);
+
+  const capacityAlerts = (dashboardData?.courseList || [])
+    .filter(c => c.maxStudents > 0)
+    .map(c => ({
+      course: c,
+      pct: c.enrolledStudents / c.maxStudents,
+    }))
+    .filter(x => x.pct >= 0.9 || x.pct <= 0.25)
+    .sort((a,b) => b.pct - a.pct)
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -213,7 +234,7 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.assignedCourses}</div>
+            <div className="text-2xl font-bold">{dashboardData?.assignedCourses ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               This semester
             </p>
@@ -226,36 +247,34 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalStudents}</div>
+            <div className="text-2xl font-bold">{dashboardData?.totalStudents ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               Across all courses
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Grades</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+        {/* Grading Tasks */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Grading Tasks</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{dashboardData?.pendingGrades}</div>
-            <p className="text-xs text-muted-foreground">
-              Need attention
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Upcoming Classes</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.upcomingClasses}</div>
-            <p className="text-xs text-muted-foreground">
-              This week
-            </p>
+            {dashboardData?.gradingTasks && dashboardData.gradingTasks.length > 0 ? (
+              <div className="space-y-3">
+                {dashboardData.gradingTasks.map((task, idx) => (
+                  <div key={`${task.courseId}-${idx}`} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <div>
+                      <p className="text-sm font-medium">{task.courseCode} — {task.courseTitle}</p>
+                      <p className="text-xs text-muted-foreground">Pending: {task.pendingCount}</p>
+                    </div>
+                    <Badge variant="destructive">{task.pendingCount}</Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No pending grading tasks</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -279,15 +298,10 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
             <Button 
               className="w-full justify-start" 
               variant="outline"
-              onClick={() => router.push('/grades')}
+              onClick={() => router.push('/courses/my')}
             >
-              <ClipboardList className="mr-2 h-4 w-4" />
-              Grade Management
-              {dashboardData?.pendingGrades && dashboardData.pendingGrades > 0 && (
-                <Badge variant="destructive" className="ml-auto">
-                  {dashboardData.pendingGrades}
-                </Badge>
-              )}
+              <BookOpen className="mr-2 h-4 w-4" />
+              My Classes
             </Button>
             <Button 
               className="w-full justify-start" 
@@ -296,14 +310,6 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
             >
               <Users className="mr-2 h-4 w-4" />
               Attendance
-            </Button>
-            <Button 
-              className="w-full justify-start" 
-              variant="outline"
-              onClick={() => router.push('/hr/leave')}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Leave Requests
             </Button>
           </CardContent>
         </Card>
@@ -320,16 +326,16 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
             {dashboardData?.courseList && dashboardData.courseList.length > 0 ? (
               <div className="space-y-4">
                 {dashboardData.courseList.map((course) => {
-                  const enrollmentStatus = getEnrollmentStatus(course.enrolledStudents, course.capacity);
+                  const enrollmentStatus = getEnrollmentStatus(course.enrolledStudents, course.maxStudents);
                   return (
                     <div key={course.id} className="p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <h4 className="font-semibold">{course.code}</h4>
-                          <p className="text-sm text-muted-foreground">{course.name}</p>
+                          <p className="text-sm text-muted-foreground">{course.title}</p>
                         </div>
                         <Badge variant="outline">
-                          {course.enrolledStudents}/{course.capacity}
+                          {course.enrolledStudents}/{course.maxStudents}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between text-sm">
@@ -348,87 +354,82 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
           </CardContent>
         </Card>
 
-        {/* Grading Tasks */}
+        {/* Today's Classes */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <Clock className="mr-2 h-5 w-5" />
-              Grading Tasks
-            </CardTitle>
+            <CardTitle className="text-lg">Today&apos;s Classes</CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData?.gradingTasks && dashboardData.gradingTasks.length > 0 ? (
+            {todaysClasses.length > 0 ? (
               <div className="space-y-3">
-                {dashboardData.gradingTasks.map((task, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
-                    <div>
-                      <p className="font-medium text-sm">{task.courseCode}</p>
-                      <p className="text-xs text-muted-foreground">{task.courseName}</p>
-                      <p className="text-xs text-orange-600">
-                        Due: {new Date(task.dueDate).toLocaleDateString()}
-                      </p>
+                {todaysClasses.map((c, idx) => {
+                  const start = formatTime(c.startTime);
+                  const end = formatTime(c.endTime);
+                  return (
+                    <div key={c.id ?? idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-sm">{c.code} — {c.title}</p>
+                        <p className="text-xs text-muted-foreground">{start && end ? `${start} - ${end}` : c.schedule || 'Time N/A'} • {c.classroom || 'Room TBA'}</p>
+                      </div>
+                      <Badge variant="outline">{c.enrolledStudents}/{c.maxStudents}</Badge>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="destructive">
-                        {task.pendingCount} pending
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No pending grading tasks</p>
+              <p className="text-sm text-muted-foreground">No classes scheduled for today.</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="lg:col-span-1">
+        {/* My Teaching Summary */}
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg flex items-center">
-              <TrendingUp className="mr-2 h-5 w-5" />
-              Recent Activity
+              <GraduationCap className="mr-2 h-5 w-5" />
+              Teaching Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData?.recentActivity && dashboardData.recentActivity.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <p className="text-muted-foreground">My Courses</p>
+                <p className="text-2xl font-bold">{dashboardData?.assignedCourses ?? 0}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <p className="text-muted-foreground">Total Students</p>
+                <p className="text-2xl font-bold">{dashboardData?.totalStudents ?? 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Capacity Alerts */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Capacity Alerts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {capacityAlerts.length > 0 ? (
               <div className="space-y-3">
-                {dashboardData.recentActivity.map((activity) => (
-                  <div key={activity.id} className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm font-medium">{activity.message}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(activity.timestamp).toLocaleDateString()}
-                    </p>
+                {capacityAlerts.map(({ course, pct }, idx) => (
+                  <div key={course.id ?? idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">{course.code} — {course.title}</p>
+                      <p className="text-xs text-muted-foreground">{course.enrolledStudents}/{course.maxStudents} ({Math.round(pct * 100)}%)</p>
+                    </div>
+                    <Badge variant={pct >= 0.9 ? 'destructive' : 'outline'}>
+                      {pct >= 0.9 ? 'Near Full' : 'Low' }
+                    </Badge>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No recent activity</p>
+              <p className="text-sm text-muted-foreground">No capacity alerts.</p>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Grade Submission Reminder */}
-      {dashboardData?.pendingGrades && dashboardData.pendingGrades > 0 && (
-        <Card className="bg-orange-50 border-orange-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-orange-900">
-                  Grade Submission Reminder
-                </h3>
-                <p className="text-orange-700">
-                  You have {dashboardData.pendingGrades} pending grades that need to be submitted.
-                </p>
-              </div>
-              <Button onClick={() => router.push('/grades')}>
-                Submit Grades
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

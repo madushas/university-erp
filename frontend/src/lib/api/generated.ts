@@ -174,7 +174,11 @@ export const api = {
       
     getAvailable: () =>
       apiClient.GET('/api/v1/courses/available'),
-      
+    
+    // Instructor's own courses
+    my: () =>
+      apiClient.GET('/api/v1/courses/my'),
+    
     search: (title: string) =>
       apiClient.GET('/api/v1/courses/search', { params: { query: { title } } }),
       
@@ -485,6 +489,18 @@ export const api = {
       delete: (id: number) =>
         apiClient.DELETE('/api/v1/student/degree-audits/{id}', { params: { path: { id } } }),
     },
+  },
+
+  // Instructors
+  instructors: {
+    getAll: () =>
+      apiClient.GET('/api/v1/instructors'),
+    
+    getById: (id: number) =>
+      apiClient.GET('/api/v1/instructors/{id}', { params: { path: { id } } }),
+    
+    search: (name: string) =>
+      apiClient.GET('/api/v1/instructors/search', { params: { query: { name } } }),
   },
 
   // HR Module

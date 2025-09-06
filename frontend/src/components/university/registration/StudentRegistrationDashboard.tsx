@@ -426,6 +426,12 @@ interface RegistrationDetailsModalProps {
 function RegistrationDetailsModal({ registration }: RegistrationDetailsModalProps) {
   const course = registration.course;
 
+  const getInstructorLabel = (c: RegistrationDto['course']): string => {
+    if (!c) return 'TBA';
+    const ext = c as unknown as { instructorName?: string; instructor?: string };
+    return ext.instructorName ?? ext.instructor ?? 'TBA';
+  };
+
   return (
     <div className="space-y-6">
       {/* Course Information */}
@@ -444,7 +450,7 @@ function RegistrationDetailsModal({ registration }: RegistrationDetailsModalProp
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="font-medium">Instructor:</span>
-              <span className="ml-2">{course?.instructor}</span>
+              <span className="ml-2">{getInstructorLabel(course)}</span>
             </div>
             <div>
               <span className="font-medium">Credits:</span>

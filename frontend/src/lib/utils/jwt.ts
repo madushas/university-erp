@@ -29,7 +29,7 @@ export const hasRole = (token: string, role: string): boolean => {
   
   const user = secureStorage.getUser();
   if (user && user.role) {
-    return user.role === role;
+    return user.role === role || user.role === `ROLE_${role}`;
   }
   // Fallback to localStorage for backward compatibility
   try {
@@ -37,7 +37,7 @@ export const hasRole = (token: string, role: string): boolean => {
     if (userData) {
       const storageItem = JSON.parse(userData);
       const legacyUser = storageItem.value;
-      return legacyUser.role === role;
+      return legacyUser.role === role || legacyUser.role === `ROLE_${role}`;
     }
   } catch {
     // ignore

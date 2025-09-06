@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
     // Enable strict type checking for production builds
     ignoreBuildErrors: false,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+  },
   // Removed experimental config that doesn't exist
 };
 

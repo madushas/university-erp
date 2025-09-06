@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -104,29 +105,41 @@ export default function HomePage() {
             {/* Visuals */}
             <div className="relative">
               <div className="grid grid-cols-2 gap-4">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=1200&auto=format&fit=crop"
                   alt="Campus walkway"
                   className="rounded-xl shadow-md object-cover h-48 sm:h-56 w-full"
-                  loading="lazy"
+                  width={1200}
+                  height={400}
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  priority={false}
                 />
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?q=80&w=1200&auto=format&fit=crop"
                   alt="Students collaborating"
                   className="rounded-xl shadow-md object-cover h-48 sm:h-56 w-full"
-                  loading="lazy"
+                  width={1200}
+                  height={400}
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  priority={false}
                 />
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=1200&auto=format&fit=crop"
                   alt="Lecture hall"
                   className="rounded-xl shadow-md object-cover h-48 sm:h-56 w-full"
-                  loading="lazy"
+                  width={1200}
+                  height={400}
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  priority={false}
                 />
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1200&auto=format&fit=crop"
                   alt="Library study area"
                   className="rounded-xl shadow-md object-cover h-48 sm:h-56 w-full"
-                  loading="lazy"
+                  width={1200}
+                  height={400}
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  priority={false}
                 />
               </div>
             </div>

@@ -4,139 +4,133 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  BookOpen, 
-  TrendingUp, 
+import {
+  Users,
+  BookOpen,
+  TrendingUp,
   DollarSign,
   Settings,
-  FileText,
-  AlertCircle,
   BarChart3,
   Shield,
   Database,
-  Activity
+  AlertCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api/generated';
 
-interface AdminDashboardData {
-  totalUsers: number;
-  totalStudents: number;
-  totalInstructors: number;
-  totalCourses: number;
-  totalRegistrations: number;
-  totalRevenue: number;
-  systemHealth: {
-    status: 'healthy' | 'warning' | 'critical';
-    uptime: string;
-    activeUsers: number;
-  };
-  recentActivity: Array<{
-    id: string;
-    type: 'user' | 'course' | 'system';
-    message: string;
-    timestamp: string;
-    severity: 'info' | 'warning' | 'error';
-  }>;
-  pendingApprovals: Array<{
-    id: string;
-    type: 'course' | 'user' | 'application';
-    title: string;
-    requestedBy: string;
-    date: string;
-  }>;
-  systemAlerts: Array<{
-    id: string;
-    type: 'security' | 'performance' | 'maintenance';
-    message: string;
-    severity: 'low' | 'medium' | 'high';
-    timestamp: string;
-  }>;
-}
+type AdminAnalytics = {
+  totalStudents?: number;
+  totalFaculty?: number; // instructors/faculty
+  totalCourses?: number;
+  totalRegistrations?: number;
+  totalDepartments?: number;
+  activeRegistrations?: number;
+  completedRegistrations?: number;
+  droppedRegistrations?: number;
+  totalRevenue?: number;
+  unpaidRegistrations?: number;
+  registrationsWithGrades?: number;
+  registrationsWithoutGrades?: number;
+  transcriptsNotReleased?: number;
+  certificatesNotIssued?: number;
+  availableCourses?: number;
+};
+
+type RecentActivityAnalytics = {
+  recentRegistrations?: number;
+  monthlyRegistrations?: number;
+  totalGradedRegistrations?: number;
+  lowAttendanceAlerts?: number;
+};
+
+type FinancialAnalytics = {
+  totalRevenue?: number;
+  unpaidRegistrations?: number;
+  unpaidAmount?: number; // BigDecimal in backend, number in JSON
+  revenueByDepartment?: Record<string, number>;
+};
 
 export function AdminDashboard({ forceError }: { forceError?: boolean }) {
-  const [dashboardData, setDashboardData] = useState<AdminDashboardData | null>(null);
+  const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
+  const [recent, setRecent] = useState<RecentActivityAnalytics | null>(null);
+  const [financial, setFinancial] = useState<FinancialAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const toNumber = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    }
+    return 0;
+  };
+
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // For testing purposes, allow forcing an error
-      const forceErrorActive = typeof window !== 'undefined' && 
-        (window.location.search.includes('forceError=true') || 
+
+      const forceErrorActive = typeof window !== 'undefined' &&
+        (window.location.search.includes('forceError=true') ||
          localStorage.getItem('forceDashboardError') === 'true');
-      
+
       if (forceErrorActive || forceError) {
         throw new Error('Forced error for testing');
       }
-      
-      // Mock data for now - replace with actual API call
-      const mockData: AdminDashboardData = {
-        totalUsers: 1247,
-        totalStudents: 1050,
-        totalInstructors: 85,
-        totalCourses: 156,
-        totalRegistrations: 3420,
-        totalRevenue: 2450000,
-        systemHealth: {
-          status: 'healthy',
-          uptime: '99.9%',
-          activeUsers: 234
-        },
-        recentActivity: [
-          {
-            id: '1',
-            type: 'user',
-            message: 'New instructor account created: Dr. Smith',
-            timestamp: '2024-01-15T10:30:00Z',
-            severity: 'info'
-          },
-          {
-            id: '2',
-            type: 'course',
-            message: 'Course CS401 capacity increased to 40',
-            timestamp: '2024-01-15T09:15:00Z',
-            severity: 'info'
-          },
-          {
-            id: '3',
-            type: 'system',
-            message: 'Database backup completed successfully',
-            timestamp: '2024-01-15T02:00:00Z',
-            severity: 'info'
-          }
-        ],
-        pendingApprovals: [
-          {
-            id: '1',
-            type: 'course',
-            title: 'New Course: Advanced Machine Learning',
-            requestedBy: 'Dr. Johnson',
-            date: '2024-01-14'
-          },
-          {
-            id: '2',
-            type: 'user',
-            title: 'Instructor Role Request',
-            requestedBy: 'John Doe',
-            date: '2024-01-13'
-          }
-        ],
-        systemAlerts: [
-          {
-            id: '1',
-            type: 'maintenance',
-            message: 'Scheduled maintenance window: Sunday 2AM-4AM',
-            severity: 'medium',
-            timestamp: '2024-01-15T08:00:00Z'
-          }
-        ]
-      };
 
-      setDashboardData(mockData);
+      const [dashRes, recentRes, finRes] = await Promise.all([
+        api.analytics.getDashboard(),
+        api.analytics.getRecentActivity(),
+        api.analytics.getFinancial(),
+      ]);
+
+      // Cast to a minimal shape to safely access possible error/data
+      const dashAny = dashRes as unknown as { data?: unknown; error?: unknown };
+      const recentAny = recentRes as unknown as { data?: unknown; error?: unknown };
+      const finAny = finRes as unknown as { data?: unknown; error?: unknown };
+
+      if (dashAny.error) throw new Error(String(dashAny.error));
+      if (recentAny.error) throw new Error(String(recentAny.error));
+      if (finAny.error) throw new Error(String(finAny.error));
+
+      const dashData = (dashAny.data || {}) as Record<string, unknown>;
+      const recentData = (recentAny.data || {}) as Record<string, unknown>;
+      const finData = (finAny.data || {}) as Record<string, unknown>;
+
+      setAnalytics({
+        totalStudents: toNumber(dashData.totalStudents),
+        totalFaculty: toNumber(dashData.totalFaculty),
+        totalCourses: toNumber(dashData.totalCourses),
+        totalRegistrations: toNumber(dashData.totalRegistrations),
+        totalDepartments: toNumber(dashData.totalDepartments),
+        activeRegistrations: toNumber(dashData.activeRegistrations),
+        completedRegistrations: toNumber(dashData.completedRegistrations),
+        droppedRegistrations: toNumber(dashData.droppedRegistrations),
+        totalRevenue: toNumber(dashData.totalRevenue),
+        unpaidRegistrations: toNumber(dashData.unpaidRegistrations),
+        registrationsWithGrades: toNumber(dashData.registrationsWithGrades),
+        registrationsWithoutGrades: toNumber(dashData.registrationsWithoutGrades),
+        transcriptsNotReleased: toNumber(dashData.transcriptsNotReleased),
+        certificatesNotIssued: toNumber(dashData.certificatesNotIssued),
+        availableCourses: toNumber(dashData.availableCourses),
+      });
+
+      setRecent({
+        recentRegistrations: toNumber(recentData.recentRegistrations),
+        monthlyRegistrations: toNumber(recentData.monthlyRegistrations),
+        totalGradedRegistrations: toNumber(recentData.totalGradedRegistrations),
+        lowAttendanceAlerts: toNumber(recentData.lowAttendanceAlerts),
+      });
+
+      const revenueByDepartment = (finData.revenueByDepartment || {}) as Record<string, number>;
+      setFinancial({
+        totalRevenue: toNumber(finData.totalRevenue),
+        unpaidRegistrations: toNumber(finData.unpaidRegistrations),
+        unpaidAmount: toNumber(finData.unpaidAmount),
+        revenueByDepartment,
+      });
+
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -190,24 +184,6 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
     );
   }
 
-  const getHealthStatusColor = (status: string) => {
-    switch (status) {
-      case 'healthy': return 'text-green-600';
-      case 'warning': return 'text-yellow-600';
-      case 'critical': return 'text-red-600';
-      default: return 'text-gray-600';
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -225,44 +201,27 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
         </Badge>
       </div>
 
-      {/* System Statistics */}
+      {/* System Statistics (from analytics) */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              All system users
-            </p>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Students</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalStudents}</div>
-            <p className="text-xs text-muted-foreground">
-              Active students
-            </p>
+            <div className="text-2xl font-bold">{analytics?.totalStudents ?? 0}</div>
+            <p className="text-xs text-muted-foreground">Active students</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Instructors</CardTitle>
+            <CardTitle className="text-sm font-medium">Faculty</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalInstructors}</div>
-            <p className="text-xs text-muted-foreground">
-              Faculty members
-            </p>
+            <div className="text-2xl font-bold">{analytics?.totalFaculty ?? 0}</div>
+            <p className="text-xs text-muted-foreground">Instructors</p>
           </CardContent>
         </Card>
 
@@ -272,10 +231,8 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalCourses}</div>
-            <p className="text-xs text-muted-foreground">
-              Available courses
-            </p>
+            <div className="text-2xl font-bold">{analytics?.totalCourses ?? 0}</div>
+            <p className="text-xs text-muted-foreground">Total courses</p>
           </CardContent>
         </Card>
 
@@ -285,10 +242,8 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalRegistrations}</div>
-            <p className="text-xs text-muted-foreground">
-              Total enrollments
-            </p>
+            <div className="text-2xl font-bold">{analytics?.totalRegistrations ?? 0}</div>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
@@ -298,47 +253,50 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ${(dashboardData?.totalRevenue || 0).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total revenue
-            </p>
+            <div className="text-2xl font-bold">${(analytics?.totalRevenue ?? 0).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total revenue</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Departments</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics?.totalDepartments ?? 0}</div>
+            <p className="text-xs text-muted-foreground">Total departments</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* System Health */}
-      <Card className="bg-green-50 border-green-200">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center">
-            <Activity className="mr-2 h-5 w-5" />
-            System Health
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center">
-              <div className={`text-2xl font-bold ${getHealthStatusColor(dashboardData?.systemHealth.status || 'healthy')}`}>
-                {dashboardData?.systemHealth.status?.toUpperCase()}
-              </div>
-              <p className="text-sm text-muted-foreground">System Status</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {dashboardData?.systemHealth.uptime}
-              </div>
-              <p className="text-sm text-muted-foreground">Uptime</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {dashboardData?.systemHealth.activeUsers}
-              </div>
-              <p className="text-sm text-muted-foreground">Active Users</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Registration Status Breakdown */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Active Registrations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics?.activeRegistrations ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Completed Registrations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics?.completedRegistrations ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Dropped Registrations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics?.droppedRegistrations ?? 0}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Main Content Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -348,40 +306,40 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
             <CardTitle className="text-lg">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button 
-              className="w-full justify-start" 
+            <Button
+              className="w-full justify-start"
               variant="outline"
               onClick={() => router.push('/admin/users')}
             >
               <Users className="mr-2 h-4 w-4" />
               User Management
             </Button>
-            <Button 
-              className="w-full justify-start" 
+            <Button
+              className="w-full justify-start"
               variant="outline"
               onClick={() => router.push('/admin/courses')}
             >
               <BookOpen className="mr-2 h-4 w-4" />
               Course Management
             </Button>
-            <Button 
-              className="w-full justify-start" 
+            <Button
+              className="w-full justify-start"
               variant="outline"
               onClick={() => router.push('/admin/analytics')}
             >
               <BarChart3 className="mr-2 h-4 w-4" />
               Analytics & Reports
             </Button>
-            <Button 
-              className="w-full justify-start" 
+            <Button
+              className="w-full justify-start"
               variant="outline"
               onClick={() => router.push('/admin/system')}
             >
               <Settings className="mr-2 h-4 w-4" />
               System Settings
             </Button>
-            <Button 
-              className="w-full justify-start" 
+            <Button
+              className="w-full justify-start"
               variant="outline"
               onClick={() => router.push('/hr')}
             >
@@ -391,123 +349,126 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
           </CardContent>
         </Card>
 
-        {/* Pending Approvals */}
+        {/* Academic Records & Compliance */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <FileText className="mr-2 h-5 w-5" />
-              Pending Approvals
-            </CardTitle>
+            <CardTitle className="text-lg">Academic Records</CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData?.pendingApprovals && dashboardData.pendingApprovals.length > 0 ? (
-              <div className="space-y-3">
-                {dashboardData.pendingApprovals.map((approval) => (
-                  <div key={approval.id} className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <div className="flex items-center justify-between mb-1">
-                      <Badge variant="outline" className="text-xs">
-                        {approval.type}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(approval.date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="font-medium text-sm">{approval.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Requested by: {approval.requestedBy}
-                    </p>
-                  </div>
-                ))}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">With Grades</p>
+                <p className="text-xl font-semibold">{analytics?.registrationsWithGrades ?? 0}</p>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No pending approvals</p>
-            )}
+              <div>
+                <p className="text-muted-foreground">Without Grades</p>
+                <p className="text-xl font-semibold">{analytics?.registrationsWithoutGrades ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Transcripts Pending</p>
+                <p className="text-xl font-semibold">{analytics?.transcriptsNotReleased ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Certificates Pending</p>
+                <p className="text-xl font-semibold">{analytics?.certificatesNotIssued ?? 0}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* System Alerts */}
+        {/* Course Availability & Unpaid */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <AlertCircle className="mr-2 h-5 w-5" />
-              System Alerts
-            </CardTitle>
+            <CardTitle className="text-lg">Course & Payments</CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData?.systemAlerts && dashboardData.systemAlerts.length > 0 ? (
-              <div className="space-y-3">
-                {dashboardData.systemAlerts.map((alert) => (
-                  <div key={alert.id} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                      <Badge className={getSeverityColor(alert.severity)}>
-                        {alert.severity}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(alert.timestamp).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-sm">{alert.message}</p>
-                  </div>
-                ))}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Available Courses</p>
+                <p className="text-xl font-semibold">{analytics?.availableCourses ?? 0}</p>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No system alerts</p>
-            )}
+              <div>
+                <p className="text-muted-foreground">Unpaid Registrations</p>
+                <p className="text-xl font-semibold">{analytics?.unpaidRegistrations ?? 0}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="lg:col-span-3">
+        {/* Recent Activity (counts) */}
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg flex items-center">
               <Database className="mr-2 h-5 w-5" />
-              Recent System Activity
+              Recent Activity (Last periods)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData?.recentActivity && dashboardData.recentActivity.length > 0 ? (
-              <div className="space-y-3">
-                {dashboardData.recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Badge variant="outline" className="text-xs">
-                        {activity.type}
-                      </Badge>
-                      <span className="text-sm">{activity.message}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(activity.timestamp).toLocaleString()}
-                    </span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <p className="text-muted-foreground text-sm">Last Week Registrations</p>
+                <p className="text-2xl font-bold">{recent?.recentRegistrations ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm">Last Month Registrations</p>
+                <p className="text-2xl font-bold">{recent?.monthlyRegistrations ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm">Graded Registrations</p>
+                <p className="text-2xl font-bold">{recent?.totalGradedRegistrations ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-sm">Low Attendance Alerts</p>
+                <p className="text-2xl font-bold">{recent?.lowAttendanceAlerts ?? 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Financial Summary */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Financial Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Revenue</span>
+                <span className="font-semibold">${(financial?.totalRevenue ?? 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Unpaid Registrations</span>
+                <span className="font-semibold">{financial?.unpaidRegistrations ?? 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Unpaid Amount</span>
+                <span className="font-semibold">${(financial?.unpaidAmount ?? 0).toLocaleString()}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Revenue by Department */}
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-lg">Revenue by Department</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {financial?.revenueByDepartment && Object.keys(financial.revenueByDepartment).length > 0 ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                {Object.entries(financial.revenueByDepartment).map(([dept, amount]) => (
+                  <div key={dept} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-muted-foreground">{dept}</span>
+                    <span className="text-sm font-medium">${(amount ?? 0).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No recent activity</p>
+              <p className="text-sm text-muted-foreground">No department revenue data</p>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Action Required Banner */}
-      {dashboardData?.pendingApprovals && dashboardData.pendingApprovals.length > 0 && (
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-yellow-900">
-                  Action Required
-                </h3>
-                <p className="text-yellow-700">
-                  You have {dashboardData.pendingApprovals.length} pending approval{dashboardData.pendingApprovals.length > 1 ? 's' : ''} that need your attention.
-                </p>
-              </div>
-              <Button onClick={() => router.push('/admin/approvals')}>
-                Review Approvals
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

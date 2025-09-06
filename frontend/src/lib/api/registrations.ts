@@ -1,14 +1,15 @@
 import apiClient from './client';
-import { RegistrationDto } from '@/lib/types/registration';
+import { api } from './generated';
+import { RegistrationDto, RegistrationStatus } from '@/lib/types/registration';
 
 export const getMyRegistrations = async (): Promise<RegistrationDto[]> => {
-  const response = await apiClient.get<RegistrationDto[]>('/api/v1/registrations/my');
-  return response.data;
+  const res = await api.registrations.getAll();
+  return (res.data as unknown as RegistrationDto[]) || [];
 };
 
 export const getCourseRegistrations = async (courseId: number): Promise<RegistrationDto[]> => {
-  const response = await apiClient.get<RegistrationDto[]>(`/api/v1/registrations/course/${courseId}`);
-  return response.data;
+  const res = await api.registrations.getByCourse(courseId);
+  return (res.data as unknown as RegistrationDto[]) || [];
 };
 
 // Simple RegistrationService class for compatibility
@@ -23,8 +24,8 @@ export class RegistrationService {
 
   static async getRegistrationById(id: number): Promise<RegistrationDto | null> {
     try {
-      const response = await apiClient.get<RegistrationDto>(`/api/v1/registrations/${id}`);
-      return response.data;
+      const res = await api.registrations.getById(id);
+      return (res.data as unknown as RegistrationDto) ?? null;
     } catch {
       return null;
     }
@@ -32,17 +33,17 @@ export class RegistrationService {
 
   static async enrollInCourse(courseId: number): Promise<RegistrationDto | null> {
     try {
-      const response = await apiClient.post<RegistrationDto>('/api/v1/registrations/enroll/' + courseId);
-      return response.data;
+      const res = await api.registrations.enroll(courseId);
+      return (res.data as unknown as RegistrationDto) ?? null;
     } catch {
       return null;
     }
   }
 
-  static async updateRegistrationStatus(id: number, status: string): Promise<RegistrationDto | null> {
+  static async updateRegistrationStatus(id: number, status: RegistrationStatus): Promise<RegistrationDto | null> {
     try {
-      const response = await apiClient.put<RegistrationDto>(`/api/v1/registrations/${id}/status`, { status });
-      return response.data;
+      const res = await api.registrations.updateStatus(id, status);
+      return (res.data as unknown as RegistrationDto) ?? null;
     } catch {
       return null;
     }
@@ -50,8 +51,8 @@ export class RegistrationService {
 
   static async updateRegistrationGrade(id: number, grade: string): Promise<RegistrationDto | null> {
     try {
-      const response = await apiClient.put<RegistrationDto>(`/api/v1/registrations/${id}/grade`, { grade });
-      return response.data;
+      const res = await api.registrations.updateGrade(id, grade);
+      return (res.data as unknown as RegistrationDto) ?? null;
     } catch {
       return null;
     }
@@ -59,8 +60,8 @@ export class RegistrationService {
 
   static async getUserRegistrations(userId: number): Promise<RegistrationDto[]> {
     try {
-      const response = await apiClient.get<RegistrationDto[]>(`/api/v1/registrations/user/${userId}`);
-      return response.data;
+      const res = await api.registrations.getByUser(userId);
+      return (res.data as unknown as RegistrationDto[]) ?? [];
     } catch {
       return [];
     }
@@ -68,7 +69,7 @@ export class RegistrationService {
 
   static async dropCourse(registrationId: number): Promise<boolean> {
     try {
-      await apiClient.delete(`/api/v1/registrations/${registrationId}`);
+      await api.registrations.delete(registrationId);
       return true;
     } catch {
       return false;

@@ -24,6 +24,13 @@ import { useRegistrations } from '@/lib/hooks/useRegistrations';
 import { RegistrationValidationUtils } from '@/lib/utils/registrationValidation';
 import type { RegistrationDto } from '@/lib/types/registration';
 
+// Helper to get instructor display name with backward compatibility
+const getInstructorLabel = (c: RegistrationDto['course']): string => {
+  if (!c) return 'TBA';
+  const ext = c as unknown as { instructorName?: string; instructor?: string };
+  return ext.instructorName ?? ext.instructor ?? 'TBA';
+};
+
 interface RegistrationHistoryProps {
   onViewDetails?: (registration: RegistrationDto) => void;
   className?: string;
@@ -46,7 +53,7 @@ export function RegistrationHistory({
       const searchMatch = !searchTerm || 
         reg.course?.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         reg.course?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        reg.course?.instructor?.toLowerCase().includes(searchTerm.toLowerCase());
+        getInstructorLabel(reg.course).toLowerCase().includes(searchTerm.toLowerCase());
 
       // Status filter
       const statusMatch = statusFilter === 'all' || reg.status === statusFilter;
@@ -470,7 +477,7 @@ function RegistrationCard({ registration, onViewDetails, compact = false }: Regi
             )}
 
             <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-              <span>Instructor: {course?.instructor}</span>
+              <span>Instructor: {getInstructorLabel(course)}</span>
               <span>{course?.credits} Credits</span>
               {registration.registrationDate && (
                 <span>

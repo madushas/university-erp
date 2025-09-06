@@ -6,6 +6,7 @@ import type {
   StudentAcademicRecord,
   EnrollmentValidation,
   CourseEnrollmentSummary,
+  RegistrationStatus,
 } from '@/lib/types/registration';
 
 interface UseRegistrationsOptions {
@@ -28,7 +29,7 @@ interface UseRegistrationsReturn {
   getRegistrationById: (id: number) => Promise<RegistrationDto | null>;
   enrollInCourse: (courseId: number) => Promise<RegistrationDto | null>;
   dropCourse: (courseId: number) => Promise<boolean>;
-  updateRegistrationStatus: (id: number, status: string) => Promise<RegistrationDto | null>;
+  updateRegistrationStatus: (id: number, status: RegistrationStatus) => Promise<RegistrationDto | null>;
   updateRegistrationGrade: (id: number, grade: string) => Promise<RegistrationDto | null>;
   validateEnrollment: (courseId: number, userId?: number) => Promise<EnrollmentValidation | null>;
   loadStatistics: () => Promise<void>;
@@ -176,7 +177,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
   /**
    * Update registration status
    */
-  const updateRegistrationStatus = useCallback(async (id: number, status: string): Promise<RegistrationDto | null> => {
+  const updateRegistrationStatus = useCallback(async (id: number, status: RegistrationStatus): Promise<RegistrationDto | null> => {
     try {
       setError(null);
       const updatedRegistration = await RegistrationService.updateRegistrationStatus(id, status);

@@ -37,6 +37,12 @@ export function RegistrationConfirmation({
   const course = registration.course;
   const student = registration.user;
 
+  const getInstructorLabel = (c: typeof registration.course): string => {
+    if (!c) return 'TBA';
+    const ext = c as unknown as { instructorName?: string; instructor?: string };
+    return ext.instructorName ?? ext.instructor ?? 'TBA';
+  };
+
   // Format registration date
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
@@ -188,7 +194,7 @@ export function RegistrationConfirmation({
                   <div className="flex items-center gap-2 text-sm">
                     <Users className="h-4 w-4 text-gray-500" />
                     <span className="font-medium">Instructor:</span>
-                    <span>{course?.instructor}</span>
+                    <span>{getInstructorLabel(course)}</span>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">

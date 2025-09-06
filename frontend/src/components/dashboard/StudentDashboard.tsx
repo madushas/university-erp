@@ -6,100 +6,81 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
   BookOpen, 
-  Calendar, 
   GraduationCap, 
   TrendingUp, 
-  Clock,
-  FileText,
   AlertCircle,
-  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api/generated';
+import { RegistrationService } from '@/lib/api/registrations';
+import type { RegistrationDto } from '@/lib/types/registration';
 
-interface StudentDashboardData {
-  currentRegistrations: number;
-  completedCourses: number;
-  totalCredits: number;
-  currentGPA: number;
-  upcomingDeadlines: Array<{
-    id: string;
-    title: string;
-    date: string;
-    type: 'assignment' | 'exam' | 'registration';
-  }>;
-  recentGrades: Array<{
-    courseCode: string;
-    courseName: string;
-    grade: string;
-    credits: number;
-  }>;
-  availableCourses: number;
-  pendingApplications: number;
-}
+type StudentAnalytics = {
+  totalRegistrations?: number;
+  currentGPA?: number;
+  activeRegistrations?: number;
+  completedRegistrations?: number;
+  droppedRegistrations?: number;
+  totalCredits?: number;
+  totalFeePaid?: number; // BigDecimal serialized
+  outstandingPayments?: number;
+  averageAttendance?: number;
+};
 
 export function StudentDashboard({ forceError }: { forceError?: boolean }) {
-  const [dashboardData, setDashboardData] = useState<StudentDashboardData | null>(null);
+  const [analytics, setAnalytics] = useState<StudentAnalytics | null>(null);
+  const [registrations, setRegistrations] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const router = useRouter();
 
+  const toNumber = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const n = Number(v);
+      return isNaN(n) ? 0 : n;
+    }
+    return 0;
+  };
+
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // For testing purposes, allow forcing an error
+      if (!user?.id) throw new Error('User not found');
+
       if (forceError) {
         throw new Error('Forced error for testing');
       }
-      
-      // Mock data for now - replace with actual API call
-      const mockData: StudentDashboardData = {
-        currentRegistrations: 5,
-        completedCourses: 12,
-        totalCredits: 45,
-        currentGPA: 3.7,
-        upcomingDeadlines: [
-          {
-            id: '1',
-            title: 'Course Registration Deadline',
-            date: '2024-02-15',
-            type: 'registration'
-          },
-          {
-            id: '2',
-            title: 'Final Exam - CS101',
-            date: '2024-02-20',
-            type: 'exam'
-          }
-        ],
-        recentGrades: [
-          {
-            courseCode: 'CS101',
-            courseName: 'Introduction to Computer Science',
-            grade: 'A',
-            credits: 3
-          },
-          {
-            courseCode: 'MATH201',
-            courseName: 'Calculus II',
-            grade: 'B+',
-            credits: 4
-          }
-        ],
-        availableCourses: 25,
-        pendingApplications: 1
-      };
 
-      setDashboardData(mockData);
+      // Fetch analytics and my registrations in parallel
+      const [res, regs] = await Promise.all([
+        api.analytics.getStudent(user.id as number),
+        RegistrationService.getMyRegistrations(),
+      ]);
+      const anyRes = res as unknown as { data?: unknown; error?: unknown };
+      if (anyRes.error) throw new Error(String(anyRes.error));
+      const data = (anyRes.data || {}) as Record<string, unknown>;
+      setAnalytics({
+        totalRegistrations: toNumber(data.totalRegistrations),
+        currentGPA: toNumber(data.currentGPA),
+        activeRegistrations: toNumber(data.activeRegistrations),
+        completedRegistrations: toNumber(data.completedRegistrations),
+        droppedRegistrations: toNumber(data.droppedRegistrations),
+        totalCredits: toNumber(data.totalCredits),
+        totalFeePaid: toNumber(data.totalFeePaid),
+        outstandingPayments: toNumber(data.outstandingPayments),
+        averageAttendance: toNumber(data.averageAttendance),
+      });
+      setRegistrations(regs || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  }, [forceError]);
+  }, [forceError, user?.id]);
 
   useEffect(() => {
     loadDashboardData();
@@ -153,12 +134,72 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
     return 'text-red-600';
   };
 
-  const getGradeColor = (grade: string) => {
-    if (grade.startsWith('A')) return 'bg-green-100 text-green-800';
-    if (grade.startsWith('B')) return 'bg-blue-100 text-blue-800';
-    if (grade.startsWith('C')) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
+  // Helpers to derive dashboard lists from real registration data
+  const todayName = (() => {
+    const d = new Date();
+    // Map JS getDay() 0-6 to string names matching backend
+    const names = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+    return names[d.getDay()];
+  })();
+
+  const hasClassToday = (daysOfWeek?: string | null): boolean => {
+    if (!daysOfWeek) return false;
+    return daysOfWeek.split(',').map(s => s.trim().toUpperCase()).includes(todayName);
   };
+
+  const formatTime = (time: unknown): string | null => {
+    if (!time) return null;
+    if (typeof time === 'string') return time.substring(0,5); // HH:mm:ss -> HH:mm
+    const isTimeObj = (val: unknown): val is { hour?: number; minute?: number } => (
+      typeof val === 'object' && val !== null && 'hour' in (val as Record<string, unknown>)
+    );
+    if (isTimeObj(time)) {
+      const hh = String(time.hour ?? 0).padStart(2,'0');
+      const mm = String(time.minute ?? 0).padStart(2,'0');
+      return `${hh}:${mm}`;
+    }
+    return null;
+  };
+
+  type CourseLike = {
+    code?: string;
+    title?: string;
+    credits?: number;
+    classroom?: string;
+    startTime?: unknown;
+    endTime?: unknown;
+    schedule?: string;
+    daysOfWeek?: string | null;
+  };
+
+  type RegistrationLike = RegistrationDto & {
+    course?: CourseLike;
+    paymentStatus?: string;
+    grade?: string;
+    status?: string;
+  };
+
+  const todaysClasses = registrations
+    .filter((r) => {
+      const reg = r as unknown as RegistrationLike;
+      return !!reg.course && hasClassToday(reg.course.daysOfWeek);
+    })
+    .slice(0, 5);
+
+  const unpaidRegistrations = registrations
+    .filter((r) => {
+      const reg = r as unknown as RegistrationLike;
+      const ps = reg.paymentStatus;
+      return !!ps && (ps === 'PENDING' || ps === 'OVERDUE' || ps === 'PARTIAL');
+    })
+    .slice(0, 5);
+
+  const recentGrades = registrations
+    .filter((r) => {
+      const reg = r as unknown as RegistrationLike;
+      return !!reg.grade;
+    })
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -169,7 +210,7 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
             Welcome back, {user?.firstName}!
           </h1>
           <p className="text-muted-foreground">
-            Here&apos;s your academic progress and upcoming activities.
+            Here&apos;s your academic progress and financial summary.
           </p>
         </div>
         <Badge variant="secondary" className="px-3 py-1">
@@ -181,11 +222,11 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current Courses</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Courses</CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.currentRegistrations}</div>
+            <div className="text-2xl font-bold">{analytics?.activeRegistrations ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               This semester
             </p>
@@ -198,7 +239,7 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
             <GraduationCap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalCredits}</div>
+            <div className="text-2xl font-bold">{analytics?.totalCredits ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               Completed credits
             </p>
@@ -211,8 +252,8 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getGPAColor(dashboardData?.currentGPA || 0)}`}>
-              {dashboardData?.currentGPA?.toFixed(2)}
+            <div className={`text-2xl font-bold ${getGPAColor(analytics?.currentGPA || 0)}`}>
+              {(analytics?.currentGPA ?? 0).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
               Cumulative GPA
@@ -222,13 +263,13 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Courses</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Completed Courses</CardTitle>
+            <GraduationCap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.availableCourses}</div>
+            <div className="text-2xl font-bold">{analytics?.completedRegistrations ?? 0}</div>
             <p className="text-xs text-muted-foreground">
-              For registration
+              All time
             </p>
           </CardContent>
         </Card>
@@ -255,7 +296,6 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
               variant="outline"
               onClick={() => router.push('/students/records')}
             >
-              <FileText className="mr-2 h-4 w-4" />
               View Transcript
             </Button>
             <Button 
@@ -263,85 +303,116 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
               variant="outline"
               onClick={() => router.push('/students/audit')}
             >
-              <GraduationCap className="mr-2 h-4 w-4" />
               Degree Audit
-            </Button>
-            <Button 
-              className="w-full justify-start" 
-              variant="outline"
-              onClick={() => router.push('/students/applications')}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Applications
-              {dashboardData?.pendingApplications && dashboardData.pendingApplications > 0 && (
-                <Badge variant="destructive" className="ml-auto">
-                  {dashboardData.pendingApplications}
-                </Badge>
-              )}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Upcoming Deadlines */}
-        <Card className="lg:col-span-1">
+        {/* Today's Classes (real data) */}
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <Clock className="mr-2 h-5 w-5" />
-              Upcoming Deadlines
-            </CardTitle>
+            <CardTitle className="text-lg">Today&apos;s Classes</CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData?.upcomingDeadlines && dashboardData.upcomingDeadlines.length > 0 ? (
+            {todaysClasses.length > 0 ? (
               <div className="space-y-3">
-                {dashboardData.upcomingDeadlines.map((deadline) => (
-                  <div key={deadline.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">{deadline.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(deadline.date).toLocaleDateString()}
-                      </p>
+                {todaysClasses.map((reg, idx) => {
+                  const rr = reg as unknown as RegistrationLike;
+                  const c = rr.course as CourseLike | undefined;
+                  const start = formatTime(c?.startTime);
+                  const end = formatTime(c?.endTime);
+                  return (
+                    <div key={(rr as { id?: number }).id ?? idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-sm">{c?.code} — {c?.title}</p>
+                        <p className="text-xs text-muted-foreground">{start && end ? `${start} - ${end}` : c?.schedule || 'Time N/A'} • {c?.classroom || 'Room TBA'}</p>
+                      </div>
+                      <Badge variant="outline">{(rr.status) || 'ENROLLED'}</Badge>
                     </div>
-                    <Badge variant={deadline.type === 'exam' ? 'destructive' : 'default'}>
-                      {deadline.type}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No upcoming deadlines</p>
+              <p className="text-sm text-muted-foreground">No classes scheduled for today.</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Recent Grades */}
-        <Card className="lg:col-span-1">
+        {/* Progress & Financial Summary */}
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <CheckCircle className="mr-2 h-5 w-5" />
-              Recent Grades
-            </CardTitle>
+            <CardTitle className="text-lg">Progress & Financial Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData?.recentGrades && dashboardData.recentGrades.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground">Dropped Courses</p>
+                <p className="text-2xl font-bold">{analytics?.droppedRegistrations ?? 0}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground">Outstanding Payments</p>
+                <p className="text-2xl font-bold">{analytics?.outstandingPayments ?? 0}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground">Fees Paid</p>
+                <p className="text-2xl font-bold">${(analytics?.totalFeePaid ?? 0).toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="mt-4 text-sm text-muted-foreground">
+              Average Attendance: <span className="font-medium">{(analytics?.averageAttendance ?? 0).toFixed(1)}%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Unpaid Courses (details from registrations) */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Unpaid Courses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {unpaidRegistrations.length > 0 ? (
               <div className="space-y-3">
-                {dashboardData.recentGrades.map((grade, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{grade.courseCode}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {grade.courseName}
-                      </p>
+                {unpaidRegistrations.map((reg, idx) => {
+                  const rr = reg as unknown as RegistrationLike;
+                  const c = rr.course as CourseLike | undefined;
+                  return (
+                    <div key={(rr as { id?: number }).id ?? idx} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                      <div>
+                        <p className="text-sm font-medium">{c?.code} — {c?.title}</p>
+                        <p className="text-xs text-red-700">Status: {rr.paymentStatus}</p>
+                      </div>
+                      <Badge variant="destructive">Attention</Badge>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-muted-foreground">
-                        {grade.credits} cr
-                      </span>
-                      <Badge className={getGradeColor(grade.grade)}>
-                        {grade.grade}
-                      </Badge>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No unpaid registrations 🎉</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Grades (from registrations) */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Recent Grades</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentGrades.length > 0 ? (
+              <div className="space-y-3">
+                {recentGrades.map((reg, idx) => {
+                  const rr = reg as unknown as RegistrationLike;
+                  const c = rr.course as CourseLike | undefined;
+                  return (
+                    <div key={(rr as { id?: number }).id ?? idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium">{c?.code} — {c?.title}</p>
+                        <p className="text-xs text-muted-foreground">Credits: {c?.credits ?? 'N/A'}</p>
+                      </div>
+                      <Badge>{rr.grade}</Badge>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No recent grades</p>
