@@ -30,16 +30,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                   FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
+            log.debug("JWT Authentication Filter - Path: {}, JWT present: {}", request.getServletPath(), jwt != null);
 
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                String username = tokenProvider.getUsernameFromToken(jwt);
+            if (StringUtils.hasText(jwt)) {
+                log.debug("JWT Token: {}", jwt.substring(0, Math.min(jwt.length(), 50)) + "...");
+                
+                if (tokenProvider.validateToken(jwt)) {
+                    log.debug("JWT token is valid");
+                    String username = tokenProvider.getUsernameFromToken(jwt);
+                    log.debug("Username from token: {}", username);
 
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                UsernamePasswordAuthenticationToken authentication = 
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    log.debug("User details loaded: {}, authorities: {}", userDetails.getUsername(), userDetails.getAuthorities());
+                    
+                    UsernamePasswordAuthenticationToken authentication = 
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    log.debug("Authentication set in security context");
+                } else {
+                    log.warn("JWT token validation failed for path: {}", request.getServletPath());
+                }
+            } else {
+                log.debug("No JWT token found in request for path: {}", request.getServletPath());
             }
         } catch (Exception ex) {
             log.error("Could not set user authentication in security context", ex);

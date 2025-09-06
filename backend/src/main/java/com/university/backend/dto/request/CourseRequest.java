@@ -1,5 +1,6 @@
 package com.university.backend.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.university.backend.modules.academic.entity.CourseStatus;
 import com.university.backend.validation.SafeInput;
 import com.university.backend.validation.ValidCourseDate;
@@ -26,10 +27,8 @@ public class CourseRequest {
     @SafeInput(message = "Description contains unsafe content")
     private String description;
     
-    @NotBlank(message = "Instructor name is required")
-    @Size(max = 100, message = "Instructor name cannot exceed 100 characters")
-    @SafeInput(message = "Instructor name contains unsafe content")
-    private String instructor;
+    @NotNull(message = "Instructor ID is required")
+    private Long instructorId;
     
     private String instructorEmail;
     
@@ -48,8 +47,10 @@ public class CourseRequest {
     @ValidCourseDate(message = "End date must be within reasonable academic range")
     private LocalDate endDate;
     
+    @JsonFormat(pattern = "HH:mm:ss")
     private LocalTime startTime;
     
+    @JsonFormat(pattern = "HH:mm:ss")
     private LocalTime endTime;
     
     private String daysOfWeek;
@@ -67,6 +68,7 @@ public class CourseRequest {
     @Max(value = 100, message = "Minimum students cannot exceed 100")
     private Integer minStudents = 1;
     
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private BigDecimal courseFee;
     
     private String prerequisites;

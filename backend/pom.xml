@@ -96,6 +96,12 @@
             <artifactId>jackson-datatype-hibernate6</artifactId>
         </dependency>
         
+        <!-- Jackson Java 8 Time Module for LocalTime/LocalDate serialization -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

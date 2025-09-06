@@ -21,7 +21,8 @@ public class CourseDto extends BaseDto {
     private String code;
     private String title;
     private String description;
-    private String instructor;
+    private Long instructorId;
+    private String instructorName;
     private String instructorEmail;
     private String department;
     private String courseLevel;

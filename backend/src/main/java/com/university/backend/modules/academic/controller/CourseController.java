@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 
@@ -38,7 +39,7 @@ public class CourseController {
         @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     @GetMapping
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<List<CourseDto>> getAllCourses() {
         List<CourseDto> courses = courseService.getAllCourses();
         return ResponseEntity.ok(courses);
@@ -46,7 +47,7 @@ public class CourseController {
 
     @Operation(summary = "Get courses with pagination", description = "Retrieve paginated courses")
     @GetMapping("/paged")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<Page<CourseDto>> getCoursesPaged(
         @PageableDefault(size = 10, sort = "title", direction = Sort.Direction.ASC) Pageable pageable) {
         Page<CourseDto> courses = courseService.getAllCoursesPaged(pageable);
@@ -55,7 +56,7 @@ public class CourseController {
 
     @Operation(summary = "Get course by ID", description = "Retrieve a specific course by its ID")
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<CourseDto> getCourseById(
         @Parameter(description = "Course ID") @PathVariable Long id) {
         CourseDto course = courseService.getCourseById(id);
@@ -64,7 +65,7 @@ public class CourseController {
 
     @Operation(summary = "Get course by code", description = "Retrieve a specific course by its code")
     @GetMapping("/code/{code}")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<CourseDto> getCourseByCode(
         @Parameter(description = "Course code") @PathVariable String code) {
         CourseDto course = courseService.getCourseByCode(code);
@@ -73,7 +74,7 @@ public class CourseController {
 
     @Operation(summary = "Get available courses", description = "Retrieve courses that are not full")
     @GetMapping("/available")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<List<CourseDto>> getAvailableCourses() {
         List<CourseDto> courses = courseService.getAvailableCourses();
         return ResponseEntity.ok(courses);
@@ -81,7 +82,7 @@ public class CourseController {
 
     @Operation(summary = "Search courses by title", description = "Search courses by title (case-insensitive)")
     @GetMapping("/search")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<List<CourseDto>> searchCoursesByTitle(
         @Parameter(description = "Title to search for") @RequestParam String title) {
         List<CourseDto> courses = courseService.searchCoursesByTitle(title);
@@ -90,10 +91,19 @@ public class CourseController {
 
     @Operation(summary = "Get courses by instructor", description = "Retrieve courses by instructor name")
     @GetMapping("/instructor/{instructor}")
-    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<List<CourseDto>> getCoursesByInstructor(
         @Parameter(description = "Instructor name") @PathVariable String instructor) {
         List<CourseDto> courses = courseService.getCoursesByInstructor(instructor);
+        return ResponseEntity.ok(courses);
+    }
+
+    @Operation(summary = "Get my courses as instructor", description = "Retrieve courses assigned to current instructor")
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('INSTRUCTOR')")
+    public ResponseEntity<List<CourseDto>> getMyCourses(Authentication authentication) {
+        String username = authentication.getName();
+        List<CourseDto> courses = courseService.getCoursesByCurrentInstructor(username);
         return ResponseEntity.ok(courses);
     }
 

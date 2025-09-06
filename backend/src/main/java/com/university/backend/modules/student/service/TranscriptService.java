@@ -527,7 +527,9 @@ public class TranscriptService {
                         .qualityPoints(calculateQualityPoints(registration.getGrade(), registration.getCourse().getCredits()))
                         .academicYear("2024-2025") // Default academic year
                         .semester("Fall 2024") // Default semester
-                        .instructorName(registration.getCourse().getInstructor())
+                        .instructorName(registration.getCourse().getInstructor() != null ? 
+                            registration.getCourse().getInstructor().getFirstName() + " " + 
+                            registration.getCourse().getInstructor().getLastName() : "TBD")
                         .courseLevel(TranscriptCourse.CourseLevel.UNDERGRADUATE) // Default level
                         .transferCredit(false)
                         .build();

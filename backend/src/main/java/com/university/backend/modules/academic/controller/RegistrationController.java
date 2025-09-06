@@ -47,9 +47,9 @@ public class RegistrationController {
         return ResponseEntity.ok(registrations);
     }
 
-    @Operation(summary = "Get course registrations", description = "Get all registrations for a specific course (admin only)")
+    @Operation(summary = "Get course registrations", description = "Get all registrations for a specific course (admin or instructor of the course)")
     @GetMapping("/course/{courseId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('INSTRUCTOR') and @courseSecurity.isInstructorOfCourse(#courseId))")
     public ResponseEntity<List<RegistrationDto>> getCourseRegistrations(
             @Parameter(description = "Course ID") @PathVariable Long courseId) {
         List<RegistrationDto> registrations = registrationService.getCourseRegistrations(courseId);

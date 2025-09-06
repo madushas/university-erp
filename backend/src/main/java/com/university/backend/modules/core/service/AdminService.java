@@ -588,7 +588,7 @@ public class AdminService {
             .code(course.getCode())
             .title(course.getTitle())
             .description(course.getDescription())
-            .instructor(course.getInstructor())
+            .instructor(course.getInstructor() != null ? course.getInstructor().getFirstName() + " " + course.getInstructor().getLastName() : "")
             .schedule(course.getSchedule())
             .credits(course.getCredits())
             .maxStudents(course.getMaxStudents())

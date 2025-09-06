@@ -19,7 +19,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     
     boolean existsByCode(String code);
     
-    List<Course> findByInstructorContainingIgnoreCase(String instructor);
+    @Query("SELECT c FROM Course c WHERE c.instructor.id = :instructorId")
+    List<Course> findByInstructorId(@Param("instructorId") Long instructorId);
+    
+    @Query("SELECT c FROM Course c WHERE LOWER(CONCAT(c.instructor.firstName, ' ', c.instructor.lastName)) LIKE LOWER(CONCAT('%', :instructorName, '%'))")
+    List<Course> findByInstructorNameContaining(@Param("instructorName") String instructorName);
     
     List<Course> findByTitleContainingIgnoreCase(String title);
     
@@ -50,8 +54,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("SELECT c FROM Course c WHERE c.daysOfWeek LIKE %:day%")
     List<Course> findCoursesByDayOfWeek(@Param("day") String day);
     
-    @Query("SELECT c FROM Course c WHERE c.instructor = :instructor AND c.status = 'ACTIVE'")
-    List<Course> findActiveCoursesByInstructor(@Param("instructor") String instructor);
+    @Query("SELECT c FROM Course c WHERE c.instructor.id = :instructorId AND c.status = 'ACTIVE'")
+    List<Course> findActiveCoursesByInstructorId(@Param("instructorId") Long instructorId);
+    
+    @Query("SELECT c FROM Course c WHERE c.instructor.username = :username AND c.status = 'ACTIVE'")
+    List<Course> findActiveCoursesByInstructorUsername(@Param("username") String username);
     
     @Query("SELECT c FROM Course c WHERE c.prerequisites IS NULL OR c.prerequisites = ''")
     List<Course> findCoursesWithoutPrerequisites();

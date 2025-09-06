@@ -9,6 +9,9 @@ import com.university.backend.exception.CourseNotFoundException;
 import com.university.backend.exception.CourseAlreadyExistsException;
 import com.university.backend.modules.academic.repository.CourseRepository;
 import com.university.backend.modules.academic.repository.RegistrationRepository;
+import com.university.backend.modules.core.repository.UserRepository;
+import com.university.backend.modules.core.entity.User;
+import com.university.backend.modules.core.entity.Role;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -29,6 +32,7 @@ public class CourseService {
 
     private final CourseRepository courseRepository;
     private final RegistrationRepository registrationRepository;
+    private final UserRepository userRepository;
     private final DtoMapper dtoMapper;
 
     @Cacheable("courses")
@@ -85,8 +89,29 @@ public class CourseService {
 
     @Transactional(readOnly = true)
     public List<CourseDto> getCoursesByInstructor(String instructor) {
-        log.info("Fetching courses by instructor: {}", instructor);
-        return courseRepository.findByInstructorContainingIgnoreCase(instructor)
+        log.info("Fetching courses by instructor username: {}", instructor);
+        return courseRepository.findActiveCoursesByInstructorUsername(instructor)
+            .stream()
+            .map(dtoMapper::toCourseDto)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public List<CourseDto> getCoursesByCurrentInstructor(String username) {
+        log.info("Fetching courses for current instructor: {}", username);
+        User instructor = userRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("Instructor not found with username: " + username));
+        
+        return courseRepository.findActiveCoursesByInstructorId(instructor.getId())
+            .stream()
+            .map(dtoMapper::toCourseDto)
+            .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public List<CourseDto> getCoursesByInstructorId(Long instructorId) {
+        log.info("Fetching courses by instructor ID: {}", instructorId);
+        return courseRepository.findByInstructorId(instructorId)
             .stream()
             .map(dtoMapper::toCourseDto)
             .collect(Collectors.toList());
@@ -100,12 +125,20 @@ public class CourseService {
             throw new CourseAlreadyExistsException("Course with code '" + request.getCode() + "' already exists");
         }
 
+        // Validate and fetch instructor
+        User instructor = userRepository.findById(request.getInstructorId())
+            .orElseThrow(() -> new IllegalArgumentException("Instructor not found with id: " + request.getInstructorId()));
+        
+        if (instructor.getRole() != Role.INSTRUCTOR) {
+            throw new IllegalArgumentException("User with id " + request.getInstructorId() + " is not an instructor");
+        }
+
         Course course = Course.builder()
             .code(request.getCode())
             .title(request.getTitle())
             .description(request.getDescription())
-            .instructor(request.getInstructor())
-            .instructorEmail(request.getInstructorEmail())
+            .instructor(instructor)
+            .instructorEmail(instructor.getEmail())
             .department(request.getDepartment())
             .courseLevel(request.getCourseLevel())
             .schedule(request.getSchedule())
@@ -145,11 +178,19 @@ public class CourseService {
             throw new CourseAlreadyExistsException("Course with code '" + request.getCode() + "' already exists");
         }
 
+        // Validate and fetch instructor
+        User instructor = userRepository.findById(request.getInstructorId())
+            .orElseThrow(() -> new IllegalArgumentException("Instructor not found with id: " + request.getInstructorId()));
+        
+        if (instructor.getRole() != Role.INSTRUCTOR) {
+            throw new IllegalArgumentException("User with id " + request.getInstructorId() + " is not an instructor");
+        }
+
         course.setCode(request.getCode());
         course.setTitle(request.getTitle());
         course.setDescription(request.getDescription());
-        course.setInstructor(request.getInstructor());
-        course.setInstructorEmail(request.getInstructorEmail());
+        course.setInstructor(instructor);
+        course.setInstructorEmail(instructor.getEmail());
         course.setDepartment(request.getDepartment());
         course.setCourseLevel(request.getCourseLevel());
         course.setSchedule(request.getSchedule());

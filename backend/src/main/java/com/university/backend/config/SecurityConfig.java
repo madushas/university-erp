@@ -81,13 +81,14 @@ public class SecurityConfig {
                 auth.requestMatchers("/actuator/**").permitAll();
                 
                 // Course endpoints
-                auth.requestMatchers(HttpMethod.GET, "/api/v1/courses/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/courses/**").hasAnyRole("STUDENT", "ADMIN", "INSTRUCTOR");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/instructors/**").hasAnyRole("ADMIN", "INSTRUCTOR");
                 auth.requestMatchers(HttpMethod.POST, "/api/v1/courses").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PUT, "/api/v1/courses/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/v1/courses/**").hasRole("ADMIN");
                 
                 // Registration endpoints
-                auth.requestMatchers(HttpMethod.GET, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN", "INSTRUCTOR");
                 auth.requestMatchers(HttpMethod.POST, "/api/v1/registrations").hasRole("STUDENT");
                 auth.requestMatchers(HttpMethod.PUT, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN");

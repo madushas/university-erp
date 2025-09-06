@@ -40,8 +40,9 @@ public class Course {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
-    private String instructor;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instructor_id", nullable = false)
+    private com.university.backend.modules.core.entity.User instructor;
 
     @Column(name = "instructor_email")
     private String instructorEmail;
