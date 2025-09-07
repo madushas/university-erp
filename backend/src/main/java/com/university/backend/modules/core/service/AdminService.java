@@ -606,6 +606,8 @@ public class AdminService {
             .registrationDate(registration.getRegistrationDate())
             .grade(registration.getGrade())
             .status(registration.getStatus().name())
+            .paymentStatus(registration.getPaymentStatus() != null ? registration.getPaymentStatus().name() : null)
+            .courseFeePaid(registration.getCourseFeePaid())
             .build();
     }
 

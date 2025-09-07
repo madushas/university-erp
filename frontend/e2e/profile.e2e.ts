@@ -678,6 +678,29 @@ test.describe('Profile Page', () => {
   // Update phone number
   await page.fill('input[name="phoneNumber"]', '+1234567890');
 
+  // Intercept self-update API call to return success
+  await page.route('**/api/v1/users/me', async (route, request) => {
+    if (request.method() === 'PUT') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: '2',
+          username: 'john_doe',
+          email: 'john@university.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          role: 'STUDENT',
+          userType: 'STUDENT',
+          studentId: 'STU001',
+          phoneNumber: '+1234567890',
+          address: '123 Student Lane'
+        })
+      });
+    }
+    return route.continue();
+  });
+
   // Click save button
   await page.click('[data-testid="button-save"]');
 

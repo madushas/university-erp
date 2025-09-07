@@ -341,6 +341,14 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
             <Button
               className="w-full justify-start"
               variant="outline"
+              onClick={() => router.push('/admin/registrations')}
+            >
+              <Database className="mr-2 h-4 w-4" />
+              Registration Management
+            </Button>
+            <Button
+              className="w-full justify-start"
+              variant="outline"
               onClick={() => router.push('/hr')}
             >
               <Shield className="mr-2 h-4 w-4" />

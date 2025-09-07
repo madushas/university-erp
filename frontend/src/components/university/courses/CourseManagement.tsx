@@ -128,36 +128,40 @@ export default function CourseManagement() {
     console.log('Register for course:', courseId);
   };
 
-  // Load statistics when component mounts
+  // Load statistics when component mounts or role changes
+  // IMPORTANT: Avoid unstable function dependencies to prevent infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // Import auth debug utility
     import('@/lib/utils/authDebug').then(({ logAuthDebug }) => {
       logAuthDebug('CourseManagement Component');
     });
 
+    const instructor = isInstructor();
+    const student = isStudent();
+    const can = canManageCourses();
+
     console.log('🔄 CourseManagement useEffect triggered', {
-      isInstructorUser,
+      instructor,
       userRole: user?.role,
-      isStudent: isStudentUser,
-      canManageCourses: canManage,
+      student,
+      canManageCourses: can,
     });
 
-    if (isInstructorUser) {
+    if (instructor) {
       console.log('👨‍🏫 Instructor: loading all courses for browse and statistics');
-      // Instructors can browse ALL courses on /courses
       loadStatistics();
       loadPagedCourses();
-    } else if (isStudentUser) {
+    } else if (student) {
       console.log('🎓 Loading all courses for student');
-      loadPagedCourses(); // Load all courses for students to browse
-    } else if (canManage) { // For admins
+      loadPagedCourses();
+    } else if (can) { // Admins
       console.log('📊 Loading all courses and statistics for admin');
       loadStatistics();
-      loadPagedCourses(); // Admins should see all courses
+      loadPagedCourses();
     } else {
       console.warn('⚠️ No matching role condition for course loading');
     }
-  }, [isInstructorUser, isStudentUser, canManage, loadPagedCourses, loadStatistics, user?.role]);
+  }, [user?.role]);
 
   return (
     <div className="space-y-6">

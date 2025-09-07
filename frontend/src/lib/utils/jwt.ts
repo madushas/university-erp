@@ -1,6 +1,7 @@
 import { jwtDecode } from 'jwt-decode';
 import { JWTPayload } from '@/lib/types/auth';
 import { secureStorage } from '@/lib/utils/secureStorage';
+import { roleEquals } from '@/lib/utils/constants';
 
 export const decodeToken = (token: string): JWTPayload | null => {
   try {
@@ -23,13 +24,13 @@ export const getTokenExpirationTime = (token: string): number | null => {
   return decoded ? decoded.exp * 1000 : null;
 };
 
-export const hasRole = (token: string, role: string): boolean => {
+export const hasRole = (_token: string, role: string): boolean => {
   // Get the role from secure storage user data
   if (typeof window === 'undefined') return false;
-  
+
   const user = secureStorage.getUser();
   if (user && user.role) {
-    return user.role === role || user.role === `ROLE_${role}`;
+    return roleEquals(user.role, role);
   }
   // Fallback to localStorage for backward compatibility
   try {
@@ -37,12 +38,12 @@ export const hasRole = (token: string, role: string): boolean => {
     if (userData) {
       const storageItem = JSON.parse(userData);
       const legacyUser = storageItem.value;
-      return legacyUser.role === role || legacyUser.role === `ROLE_${role}`;
+      return roleEquals(legacyUser?.role, role);
     }
   } catch {
     // ignore
   }
-  
+
   return false;
 };
 

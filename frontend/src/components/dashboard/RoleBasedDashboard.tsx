@@ -1,6 +1,8 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
+import { normalizeRole } from '@/lib/utils/constants';
+
 import { StudentDashboard } from './StudentDashboard';
 import { InstructorDashboard } from './InstructorDashboard';
 import { AdminDashboard } from './AdminDashboard';
@@ -51,8 +53,8 @@ export function RoleBasedDashboard({ className = '' }: RoleBasedDashboardProps) 
     );
   }
 
-  // Get user role - the API returns a single role, not an array
-  const userRole = user.role || 'STUDENT';
+  // Get user role - normalize to unprefixed uppercase
+  const userRole = normalizeRole(user.role) || 'STUDENT';
   
   // Use the user's role directly
   const primaryRole = userRole;

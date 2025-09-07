@@ -94,7 +94,8 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.DELETE, "/api/v1/registrations/**").hasAnyRole("STUDENT", "ADMIN");
                 
                 // User endpoints
-                auth.requestMatchers(HttpMethod.GET, "/api/v1/users/me").hasAnyRole("STUDENT", "ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/users/me").hasAnyRole("STUDENT", "ADMIN", "INSTRUCTOR");
+                auth.requestMatchers(HttpMethod.PUT, "/api/v1/users/me").hasAnyRole("STUDENT", "ADMIN", "INSTRUCTOR");
                 auth.requestMatchers(HttpMethod.GET, "/api/v1/users/**").hasRole("ADMIN");
                 
                 // Admin endpoints - All require ADMIN role

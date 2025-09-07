@@ -17,6 +17,7 @@ import {
   Briefcase
 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { normalizeRole } from '@/lib/utils/constants';
 import { toast } from 'sonner';
 import { updateUserProfile } from '@/lib/api/users';
 
@@ -26,18 +27,20 @@ interface ProfileFormData {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  phoneNumber: string;
   address: string;
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, refreshAuth, setUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof ProfileFormData, string>>>({});
   const [formData, setFormData] = useState<ProfileFormData>({
     firstName: '',
     lastName: '',
     email: '',
-    phone: '',
+    phoneNumber: '',
     address: '',
   });
 
@@ -47,28 +50,58 @@ export default function ProfilePage() {
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
-        phone: '', // User object doesn't have phone field
-        address: '', // User object doesn't have address field
+        phoneNumber: user.phoneNumber || '',
+        address: user.address || '',
       });
+      setErrors({});
     }
   }, [user]);
 
-  const handleSave = async () => {
-    if (!user?.id) return;
+  const validate = (): boolean => {
+    const newErrors: Partial<Record<keyof ProfileFormData, string>> = {};
+    if (!formData.firstName?.trim()) newErrors.firstName = 'First name is required';
+    if (!formData.lastName?.trim()) newErrors.lastName = 'Last name is required';
+    const email = formData.email?.trim() || '';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) newErrors.email = 'Email is required';
+    else if (!emailRegex.test(email)) newErrors.email = 'Please enter a valid email address';
+    if (formData.phoneNumber && formData.phoneNumber.length > 30) newErrors.phoneNumber = 'Phone number is too long';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
+  const handleSave = async () => {
+    if (!validate()) {
+      toast.error('Please fix the errors in the form');
+      return;
+    }
     try {
-      await updateUserProfile(user.id.toString(), {
+      setSaving(true);
+      const updated = await updateUserProfile({
         firstName: formData.firstName,
         lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
+        // Email is not updatable from the UI/backend
+        phoneNumber: formData.phoneNumber,
         address: formData.address,
       });
-      // Note: setUser is not available in useAuth, would need to refresh auth
+      // Immediately reflect latest user details
+      setUser(updated);
+      setFormData({
+        firstName: updated.firstName || '',
+        lastName: updated.lastName || '',
+        email: updated.email || formData.email,
+        phoneNumber: updated.phoneNumber || '',
+        address: updated.address || '',
+      });
+      // Also refresh auth cache (tokens/user) if applicable
+      await refreshAuth?.();
       toast.success('Profile updated successfully');
       setIsEditing(false);
-    } catch {
-      toast.error('Failed to update profile');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to update profile';
+      toast.error(message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -78,8 +111,8 @@ export default function ProfilePage() {
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
-        phone: '', // User object doesn't have phone field
-        address: '', // User object doesn't have address field
+        phoneNumber: user.phoneNumber || '',
+        address: user.address || '',
       });
     }
     setIsEditing(false);
@@ -195,6 +228,7 @@ export default function ProfilePage() {
                       variant="outline"
                       size="sm"
                       onClick={handleCancel}
+                      disabled={saving}
                     >
                       <X className="h-4 w-4 mr-2" />
                       Cancel
@@ -203,9 +237,10 @@ export default function ProfilePage() {
                       data-testid="button-save"
                       size="sm"
                       onClick={handleSave}
+                      disabled={saving}
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      Save
+                      {saving ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
                 )}
@@ -229,6 +264,7 @@ export default function ProfilePage() {
                         {user?.firstName || 'Not provided'}
                       </p>
                     )}
+                    {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName}</p>}
                   </div>
 
                   <div>
@@ -248,6 +284,7 @@ export default function ProfilePage() {
                         {user?.lastName || 'Not provided'}
                       </p>
                     )}
+                    {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName}</p>}
                   </div>
 
                   <div>
@@ -255,19 +292,23 @@ export default function ProfilePage() {
                       Email Address
                     </label>
                     {isEditing ? (
+                    <>
                       <Input
                         name="email"
                         data-testid="input-email"
                         type="email"
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="Enter email address"
+                        disabled
+                        placeholder="Email cannot be changed"
                       />
-                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">Email cannot be changed.</p>
+                    </>
+                  ) : (
                       <p className="text-sm text-gray-900 py-2 px-3 bg-gray-50 rounded-md">
                         {user?.email || 'Not provided'}
                       </p>
                     )}
+                    {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
                   </div>
 
                   <div>
@@ -279,15 +320,16 @@ export default function ProfilePage() {
                         name="phoneNumber"
                         data-testid="input-phoneNumber"
                         type="tel"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        value={formData.phoneNumber}
+                        onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                         placeholder="Enter phone number"
                       />
                     ) : (
                       <p className="text-sm text-gray-900 py-2 px-3 bg-gray-50 rounded-md">
-                        {formData.phone || 'Not provided'}
+                        {formData.phoneNumber || 'Not provided'}
                       </p>
                     )}
+                    {errors.phoneNumber && <p className="text-xs text-red-600 mt-1">{errors.phoneNumber}</p>}
                   </div>
                 </div>
 
@@ -328,8 +370,8 @@ export default function ProfilePage() {
                     {user?.role && (
                       <Badge className={getRoleColor(user.role)}>
                         <div className="flex items-center space-x-1">
-                          {getRoleIcon(user.role)}
-                          <span>{user.role}</span>
+                          {getRoleIcon(normalizeRole(user.role) || user.role)}
+                          <span>{normalizeRole(user.role) || user.role}</span>
                         </div>
                       </Badge>
                     )}

@@ -7,6 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import CourseCard from './CourseCard';
 import type { CourseDto } from '@/lib/types/course';
+import { useRegistrations } from '@/lib/hooks/useRegistrations';
+import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 interface CourseListProps {
   courses: CourseDto[];
@@ -52,9 +55,12 @@ export default function CourseList({
   const [selectedLevel, setSelectedLevel] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   const canManage = canManageCourses();
   const isStudentUser = isStudent();
+  // Only students need their registrations here; avoid extra calls for admins/instructors
+  const { registrations, enrollInCourse, dropCourse, refresh } = useRegistrations({ autoLoad: isStudentUser });
 
   const filteredCourses = courses.filter(course => {
     if (searchTerm && !course.title?.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -73,6 +79,64 @@ export default function CourseList({
     setSearchTerm('');
     setSelectedLevel('');
     setSelectedStatus('');
+  };
+
+  // Keep registrations in sync if other pages/components update them
+  useEffect(() => {
+    const handler = () => {
+      refresh();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('registrations:updated', handler);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('registrations:updated', handler);
+      }
+    };
+  }, [refresh]);
+
+  const isEnrolled = (courseId?: number) => {
+    if (!courseId) return false;
+    return registrations.some(reg => reg.course?.id === courseId && ['ENROLLED', 'PENDING'].includes(reg.status || ''));
+  };
+
+  const handleEnroll = async (courseId: number) => {
+    try {
+      setActionLoadingId(courseId);
+      const res = await enrollInCourse(courseId);
+      if (res) {
+        toast.success('Enrolled successfully');
+        await refresh();
+      } else {
+        toast.error('Failed to enroll');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to enroll';
+      toast.error(msg);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDrop = async (courseId: number) => {
+    const confirmed = typeof window === 'undefined' ? true : window.confirm('Are you sure you want to drop this course?');
+    if (!confirmed) return;
+    try {
+      setActionLoadingId(courseId);
+      const ok = await dropCourse(courseId);
+      if (ok) {
+        toast.success('Course dropped successfully');
+        await refresh();
+      } else {
+        toast.error('Unable to drop course');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to drop course';
+      toast.error(msg);
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   return (
@@ -212,6 +276,10 @@ export default function CourseList({
               onEdit={() => onEdit?.(course)}
               onDelete={() => course.id && onDelete?.(course.id)}
               onSelect={() => onCourseSelect?.(course)}
+              isEnrolled={isEnrolled(course.id)}
+              onEnroll={course.id ? () => handleEnroll(course.id!) : undefined}
+              onDrop={course.id ? () => handleDrop(course.id!) : undefined}
+              actionLoading={actionLoadingId === course.id}
             />
           ))}
         </div>

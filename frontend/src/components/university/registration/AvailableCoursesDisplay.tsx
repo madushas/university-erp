@@ -22,6 +22,7 @@ import { useCourses } from '@/lib/hooks/useCourses';
 import { useRegistrations, useEnrollmentValidation } from '@/lib/hooks/useRegistrations';
 import type { CourseDto, CourseSearchParams } from '@/lib/types/course';
 import type { EnrollmentValidation } from '@/lib/types/registration';
+import { toast } from 'sonner';
 
 interface AvailableCoursesDisplayProps {
   onCourseSelect?: (course: CourseDto) => void;
@@ -110,11 +111,18 @@ export function AvailableCoursesDisplay({
   // Handle enrollment
   const handleEnroll = async (courseId: number) => {
     try {
-      await enrollInCourse(courseId);
+      const reg = await enrollInCourse(courseId);
+      if (reg) {
+        toast.success('Enrolled successfully');
+      } else {
+        toast.error('Failed to enroll in course');
+      }
       // Refresh courses to update enrollment counts
       loadPagedCourses(searchParams);
     } catch (error) {
       console.error('Enrollment failed:', error);
+      const msg = error instanceof Error ? error.message : 'Enrollment failed';
+      toast.error(msg);
     }
     
     onEnrollClick?.(courseId);
@@ -191,13 +199,13 @@ export function AvailableCoursesDisplay({
           <div className="flex flex-wrap gap-4">
             <Select
               value={searchParams.department || ''}
-              onValueChange={(value) => handleFilterChange('department', value || undefined)}
+              onValueChange={(value) => handleFilterChange('department', value === 'ALL' ? undefined : value)}
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Departments</SelectItem>
+                <SelectItem value="ALL">All Departments</SelectItem>
                 <SelectItem value="Computer Science">Computer Science</SelectItem>
                 <SelectItem value="Mathematics">Mathematics</SelectItem>
                 <SelectItem value="Business">Business</SelectItem>
@@ -207,13 +215,13 @@ export function AvailableCoursesDisplay({
 
             <Select
               value={searchParams.courseLevel || ''}
-              onValueChange={(value) => handleFilterChange('courseLevel', value || undefined)}
+              onValueChange={(value) => handleFilterChange('courseLevel', value === 'ALL' ? undefined : value)}
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Levels" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Levels</SelectItem>
+                <SelectItem value="ALL">All Levels</SelectItem>
                 <SelectItem value="UNDERGRADUATE">Undergraduate</SelectItem>
                 <SelectItem value="GRADUATE">Graduate</SelectItem>
                 <SelectItem value="DOCTORAL">Doctoral</SelectItem>
@@ -222,13 +230,13 @@ export function AvailableCoursesDisplay({
 
             <Select
               value={searchParams.credits?.toString() || ''}
-              onValueChange={(value) => handleFilterChange('credits', value ? parseInt(value) : undefined)}
+              onValueChange={(value) => handleFilterChange('credits', value === 'ALL' ? undefined : parseInt(value))}
             >
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="Credits" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Credits</SelectItem>
+                <SelectItem value="ALL">All Credits</SelectItem>
                 <SelectItem value="1">1 Credit</SelectItem>
                 <SelectItem value="2">2 Credits</SelectItem>
                 <SelectItem value="3">3 Credits</SelectItem>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RegistrationService } from '@/lib/api/registrations';
 import type {
   RegistrationDto,
@@ -50,6 +50,54 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
   const [error, setError] = useState<string | null>(null);
   const [statistics, setStatistics] = useState<RegistrationStatistics | null>(null);
 
+  const notifyUpdated = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('registrations:updated'));
+    }
+  };
+
+  const toTime = useCallback((r: RegistrationDto): number => {
+    const updated = (r as unknown as { updatedAt?: string | null }).updatedAt;
+    const regDate = (r as unknown as { registrationDate?: string | null }).registrationDate;
+    const created = (r as unknown as { createdAt?: string | null }).createdAt;
+    const d = updated ?? regDate ?? created ?? null;
+    if (typeof d === 'string') {
+      const t = Date.parse(d);
+      return Number.isNaN(t) ? 0 : t;
+    }
+    return 0;
+  }, []);
+
+  const dedupLatestByCourse = useCallback((list: RegistrationDto[]): RegistrationDto[] => {
+    const isActive = (reg?: RegistrationDto) => {
+      const s = reg?.status || '';
+      return s === 'ENROLLED' || s === 'PENDING';
+    };
+    const map = new Map<number, RegistrationDto>();
+    for (const r of list) {
+      const courseId = r.course?.id;
+      if (!courseId) continue;
+      const current = map.get(courseId);
+      if (!current) {
+        map.set(courseId, r);
+        continue;
+      }
+      const currActive = isActive(current);
+      const nextActive = isActive(r);
+      if (nextActive && !currActive) {
+        map.set(courseId, r);
+        continue;
+      }
+      if (nextActive === currActive) {
+        if (toTime(r) >= toTime(current)) {
+          map.set(courseId, r);
+        }
+      }
+      // otherwise keep current (active wins over inactive regardless of time)
+    }
+    return Array.from(map.values());
+  }, [toTime]);
+
   /**
    * Load current user's registrations
    */
@@ -58,7 +106,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
       setLoading(true);
       setError(null);
       const data = await RegistrationService.getMyRegistrations();
-      setRegistrations(data);
+      setRegistrations(dedupLatestByCourse(data));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load registrations';
       setError(errorMessage);
@@ -66,7 +114,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dedupLatestByCourse]);
 
   /**
    * Load registrations for a specific user
@@ -76,7 +124,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
       setLoading(true);
       setError(null);
       const data = await RegistrationService.getUserRegistrations(targetUserId);
-      setRegistrations(data);
+      setRegistrations(dedupLatestByCourse(data));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load user registrations';
       setError(errorMessage);
@@ -84,7 +132,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dedupLatestByCourse]);
 
   /**
    * Load registrations for a specific course
@@ -94,7 +142,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
       setLoading(true);
       setError(null);
       const data = await RegistrationService.getCourseRegistrations(targetCourseId);
-      setRegistrations(data);
+      setRegistrations(dedupLatestByCourse(data));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load course registrations';
       setError(errorMessage);
@@ -102,7 +150,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dedupLatestByCourse]);
 
   /**
    * Load registrations based on options
@@ -130,7 +178,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
       console.error('Error getting registration by ID:', err);
       return null;
     }
-  }, []);
+  }, [dedupLatestByCourse]);
 
   /**
    * Enroll in a course
@@ -142,7 +190,8 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
       
       // Add to local state
       if (newRegistration) {
-        setRegistrations(prev => [...prev, newRegistration]);
+        setRegistrations(prev => dedupLatestByCourse([...prev, newRegistration]));
+        notifyUpdated();
       }
       
       return newRegistration;
@@ -164,6 +213,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
       
       // Remove from local state
       setRegistrations(prev => prev.filter(reg => reg.course?.id !== courseId));
+      notifyUpdated();
       
       return true;
     } catch (err) {
@@ -187,6 +237,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
         setRegistrations(prev => prev.map(reg => 
           reg.id === id ? updatedRegistration : reg
         ));
+        notifyUpdated();
       }
       
       return updatedRegistration;
@@ -211,6 +262,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
         setRegistrations(prev => prev.map(reg => 
           reg.id === id ? updatedRegistration : reg
         ));
+        notifyUpdated();
       }
       
       return updatedRegistration;
@@ -267,11 +319,12 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
     await loadRegistrations();
   }, [loadRegistrations]);
 
-  // Auto-load registrations on mount if enabled
+  // Auto-load registrations on mount if enabled (only once)
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (autoLoad) {
-      loadRegistrations();
-    }
+    if (!autoLoad || initializedRef.current) return;
+    initializedRef.current = true;
+    loadRegistrations();
   }, [autoLoad, loadRegistrations]);
 
   return {

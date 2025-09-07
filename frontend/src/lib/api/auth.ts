@@ -1,6 +1,7 @@
 import { api, publicApiClient } from './generated';
 import { LoginRequest, RegisterRequest, AuthResponse, User } from '@/lib/types/auth';
 import { secureStorage } from '@/lib/utils/secureStorage';
+import { roleEquals } from '@/lib/utils/constants';
 
 // Simple error class
 export class AuthError extends Error {
@@ -124,7 +125,7 @@ export class EnhancedAuthApi {
   async validateRole(requiredRole: string): Promise<boolean> {
     try {
       const user = await this.getCurrentUser();
-      return user.role === requiredRole;
+      return roleEquals(user.role, requiredRole);
     } catch {
       return false;
     }

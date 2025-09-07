@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,10 @@ interface CourseCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onSelect?: () => void;
+  isEnrolled?: boolean;
+  onEnroll?: () => void;
+  onDrop?: () => void;
+  actionLoading?: boolean;
 }
 
 const getStatusColor = (status?: string) => {
@@ -58,7 +63,11 @@ export default function CourseCard({
   isStudent,
   onEdit,
   onDelete,
-  onSelect
+  onSelect,
+  isEnrolled = false,
+  onEnroll,
+  onDrop,
+  actionLoading = false
 }: CourseCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const enrollmentStatus = getEnrollmentStatus(course.enrolledStudents, course.maxStudents);
@@ -126,13 +135,34 @@ export default function CourseCard({
             </Button>
             
             {isStudent && course.status === 'ACTIVE' && (
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={(course.enrolledStudents ?? 0) >= (course.maxStudents ?? 0)}
-              >
-                Register
-              </Button>
+              isEnrolled ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDrop?.();
+                  }}
+                  disabled={actionLoading}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  {actionLoading ? 'Dropping...' : 'Drop'}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={actionLoading || (course.enrolledStudents ?? 0) >= (course.maxStudents ?? 0)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEnroll?.();
+                  }}
+                >
+                  {actionLoading
+                    ? 'Registering...'
+                    : (course.enrolledStudents ?? 0) >= (course.maxStudents ?? 0) ? 'Full' : 'Register'}
+                </Button>
+              )
             )}
             
             {canManage && (
@@ -285,26 +315,43 @@ export default function CourseCard({
       {/* Action Buttons */}
       <div className="flex gap-2">
         {isStudent && course.status === 'ACTIVE' && (
-          <Button
-            size="sm"
-            className="flex-1 bg-blue-600 hover:bg-blue-700"
-            disabled={(course.enrolledStudents ?? 0) >= (course.maxStudents ?? 0)}
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle registration
-            }}
-          >
-            {(course.enrolledStudents ?? 0) >= (course.maxStudents ?? 0) ? 'Full' : 'Register'}
-          </Button>
+          isEnrolled ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+              disabled={actionLoading}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onDrop?.();
+              }}
+            >
+              {actionLoading ? 'Dropping...' : 'Drop'}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              disabled={actionLoading || (course.enrolledStudents ?? 0) >= (course.maxStudents ?? 0)}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onEnroll?.();
+              }}
+            >
+              {actionLoading
+                ? 'Registering...'
+                : (course.enrolledStudents ?? 0) >= (course.maxStudents ?? 0) ? 'Full' : 'Register'}
+            </Button>
+          )
         )}
-        
+
         {canManage && (
           <>
             <Button
               variant="outline"
               size="sm"
               className="flex-1"
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 onEdit();
               }}
@@ -314,7 +361,7 @@ export default function CourseCard({
             <Button
               variant="outline"
               size="sm"
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 onDelete();
               }}
@@ -324,13 +371,13 @@ export default function CourseCard({
             </Button>
           </>
         )}
-        
+
         {!isStudent && !canManage && (
           <Button
             variant="outline"
             size="sm"
             className="flex-1"
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               setShowDetails(!showDetails);
             }}

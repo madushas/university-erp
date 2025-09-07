@@ -33,6 +33,7 @@ import { useRegistrations } from '@/lib/hooks/useRegistrations';
 import { RegistrationValidationUtils } from '@/lib/utils/registrationValidation';
 import type { RegistrationDto } from '@/lib/types/registration';
 import { NAV_ROUTES } from '@/lib/utils/constants';
+import { toast } from 'sonner';
 
 interface CurrentRegistrationsDisplayProps {
   onViewDetails?: (registration: RegistrationDto) => void;
@@ -67,12 +68,19 @@ export function CurrentRegistrationsDisplay({
 
     setDroppingCourse(true);
     try {
-      await dropCourse(registration.course.id);
-      setShowDropDialog(false);
-      setSelectedRegistration(null);
-      refresh();
+      const ok = await dropCourse(registration.course.id);
+      if (ok) {
+        toast.success('Course dropped successfully');
+        setShowDropDialog(false);
+        setSelectedRegistration(null);
+        refresh();
+      } else {
+        toast.error('Unable to drop course');
+      }
     } catch (error) {
       console.error('Failed to drop course:', error);
+      const msg = error instanceof Error ? error.message : 'Failed to drop course';
+      toast.error(msg);
     } finally {
       setDroppingCourse(false);
     }

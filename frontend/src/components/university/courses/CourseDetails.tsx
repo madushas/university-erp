@@ -8,6 +8,8 @@ import { useCourse } from '@/lib/hooks/useCourses';
 import { useRoleAccess } from '@/lib/hooks/useRoleAccess';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { getCourseRegistrations, RegistrationService } from '@/lib/api/registrations';
+import { useRegistrations } from '@/lib/hooks/useRegistrations';
+import { toast } from 'sonner';
 import { RegistrationDto } from '@/lib/types/registration';
 
 interface CourseDetailsProps {
@@ -68,11 +70,13 @@ export default function CourseDetails({
   const { course, loading, error, clearError } = useCourse(courseId);
   const { canManageCourses, isStudent, isInstructor } = useRoleAccess();
   const { user } = useAuth();
+  const { registrations: myRegistrations, enrollInCourse, dropCourse, refresh } = useRegistrations({ autoLoad: isStudent() });
   const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'overview');
-  const [registrations, setRegistrations] = useState<RegistrationDto[]>([]);
+  const [courseRegistrations, setCourseRegistrations] = useState<RegistrationDto[]>([]);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
   const [gradeInputs, setGradeInputs] = useState<Record<number, string>>({});
+  const [actionLoading, setActionLoading] = useState(false);
 
   const canManage = canManageCourses();
   const isStudentUser = isStudent();
@@ -88,7 +92,7 @@ export default function CourseDetails({
         setRegLoading(true);
         setRegError(null);
         const data = await getCourseRegistrations(courseId);
-        setRegistrations(data);
+        setCourseRegistrations(data);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load enrolled students';
         setRegError(msg);
@@ -137,9 +141,12 @@ export default function CourseDetails({
     ? ((course.enrolledStudents || 0) / course.maxStudents) * 100
     : 0;
 
+  const alreadyEnrolled = isStudentUser && myRegistrations.some(r => r.course?.id === courseId && ['ENROLLED','PENDING'].includes(r.status || ''));
+  const myReg = isStudentUser ? myRegistrations.find(r => r.course?.id === courseId && ['ENROLLED','PENDING'].includes(r.status || '')) : null;
   const canEnroll = isStudentUser && 
     course.status === 'ACTIVE' && 
-    (course.enrolledStudents || 0) < (course.maxStudents || 0);
+    (course.enrolledStudents || 0) < (course.maxStudents || 0) &&
+    !alreadyEnrolled;
 
   // Build tab list dynamically based on permissions
   const baseTabs: TabType[] = ['overview', 'schedule', 'enrollment'];
@@ -168,12 +175,57 @@ export default function CourseDetails({
         </div>
 
         <div className="flex gap-2">
+          {isStudentUser && alreadyEnrolled && (
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const confirmed = typeof window === 'undefined' ? true : window.confirm('Are you sure you want to drop this course?');
+                if (!confirmed) return;
+                try {
+                  setActionLoading(true);
+                  const ok = await dropCourse(course.id!);
+                  if (ok) {
+                    toast.success('Course dropped successfully');
+                    await refresh();
+                  } else {
+                    toast.error('Unable to drop course');
+                  }
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : 'Failed to drop course';
+                  toast.error(msg);
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Dropping...' : 'Drop Course'}
+            </Button>
+          )}
           {canEnroll && (
             <Button
-              onClick={() => onRegister?.(course.id!)}
+              onClick={async () => {
+                try {
+                  setActionLoading(true);
+                  const reg = await enrollInCourse(course.id!);
+                  if (reg) {
+                    toast.success('Enrolled successfully');
+                    await refresh();
+                  } else {
+                    // Fallback to parent handler if provided
+                    await onRegister?.(course.id!);
+                  }
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : 'Failed to enroll';
+                  toast.error(msg);
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
               className="bg-blue-600 hover:bg-blue-700"
+              disabled={actionLoading}
             >
-              Register for Course
+              {actionLoading ? 'Registering...' : 'Register for Course'}
             </Button>
           )}
           {canManage && (
@@ -294,45 +346,28 @@ export default function CourseDetails({
                 )}
               </div>
             </Card>
-
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Enrollment Status</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Enrolled:</span>
-                  <span className="text-gray-900 font-medium">
-                    {course.enrolledStudents || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Capacity:</span>
-                  <span className="text-gray-900 font-medium">
-                    {course.maxStudents || 'No limit'}
-                  </span>
-                </div>
-                {course.minStudents && (
+            {isStudentUser && myReg && (
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Registration</h3>
+                <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Minimum:</span>
-                    <span className="text-gray-900 font-medium">{course.minStudents}</span>
+                    <span className="text-gray-500">Registration Status:</span>
+                    <span className="text-gray-900 font-medium">{myReg.status || 'N/A'}</span>
                   </div>
-                )}
-                
-                {course.maxStudents && course.maxStudents > 0 && (
-                  <div className="mt-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Enrollment Progress</span>
-                      <span>{Math.round(enrollmentPercentage)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, enrollmentPercentage)}%` }}
-                      />
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Payment Status:</span>
+                    <span className={`font-medium ${myReg.paymentStatus === 'PAID' ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {myReg.paymentStatus || 'PENDING'}
+                    </span>
                   </div>
-                )}
-              </div>
-            </Card>
+                  {(myReg.paymentStatus || 'PENDING') !== 'PAID' && (course.courseFee && course.courseFee > 0) && (
+                    <div className="pt-2 text-xs text-gray-600">
+                      Tuition for this course is pending. You can proceed to pay from your billing section.
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
         </div>
       )}
@@ -348,7 +383,6 @@ export default function CourseDetails({
                 </label>
                 <p className="text-gray-900">{course.schedule || 'TBA'}</p>
               </div>
-              
               {course.daysOfWeek && (
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -357,7 +391,6 @@ export default function CourseDetails({
                   <p className="text-gray-900">{course.daysOfWeek}</p>
                 </div>
               )}
-              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -372,7 +405,6 @@ export default function CourseDetails({
                   <p className="text-gray-900">{formatTime(course.endTime)}</p>
                 </div>
               </div>
-              
               {course.classroom && (
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -397,7 +429,6 @@ export default function CourseDetails({
                   </p>
                 </div>
               )}
-              
               {course.endDate && (
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -408,7 +439,6 @@ export default function CourseDetails({
                   </p>
                 </div>
               )}
-              
               {course.startDate && course.endDate && (
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -416,8 +446,7 @@ export default function CourseDetails({
                   </label>
                   <p className="text-gray-900">
                     {Math.ceil(
-                      (new Date(course.endDate).getTime() - new Date(course.startDate).getTime()) 
-                      / (1000 * 60 * 60 * 24 * 7)
+                      (new Date(course.endDate).getTime() - new Date(course.startDate).getTime()) / (1000 * 60 * 60 * 24 * 7)
                     )} weeks
                   </p>
                 </div>
@@ -512,11 +541,11 @@ export default function CourseDetails({
               <div className="text-red-600 text-sm">{regError}</div>
             )}
             {!regLoading && !regError && (
-              registrations.length === 0 ? (
+              courseRegistrations.length === 0 ? (
                 <div className="text-gray-600">No students enrolled yet.</div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {registrations.map((reg) => (
+                  {courseRegistrations.map((reg) => (
                     <Card key={reg.id} className="p-4">
                       <div className="font-medium text-gray-900">{reg.user?.firstName} {reg.user?.lastName}</div>
                       <div className="text-sm text-gray-600">{reg.user?.email}</div>
@@ -539,7 +568,7 @@ export default function CourseDetails({
               <div className="text-gray-600">You are not authorized to view this section.</div>
             )}
             {canViewStudents && (
-              registrations.length === 0 ? (
+              courseRegistrations.length === 0 ? (
                 <div className="text-gray-600">No registrations available.</div>
               ) : (
                 <div className="overflow-x-auto">
@@ -554,7 +583,7 @@ export default function CourseDetails({
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {registrations.map((reg) => (
+                      {courseRegistrations.map((reg) => (
                         <tr key={reg.id}>
                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{reg.user?.firstName} {reg.user?.lastName}</td>
                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{reg.status}</td>
@@ -580,7 +609,7 @@ export default function CourseDetails({
                                 const updated = await RegistrationService.updateRegistrationGrade(reg.id!, grade);
                                 if (updated) {
                                   const data = await getCourseRegistrations(courseId);
-                                  setRegistrations(data);
+                                  setCourseRegistrations(data);
                                 }
                               }}
                             >

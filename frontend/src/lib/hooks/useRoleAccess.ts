@@ -1,17 +1,17 @@
 import { useAuth } from '@/lib/store/authStore';
-import { ROLES } from '@/lib/utils/constants';
+import { ROLES, roleEquals, normalizeRole } from '@/lib/utils/constants';
 
 export const useRoleAccess = () => {
   const { user, isAuthenticated } = useAuth();
 
   const hasRole = (requiredRole: keyof typeof ROLES): boolean => {
     if (!isAuthenticated || !user) return false;
-    return user.role === ROLES[requiredRole];
+    return roleEquals(user.role, requiredRole);
   };
 
   const hasAnyRole = (requiredRoles: (keyof typeof ROLES)[]): boolean => {
     if (!isAuthenticated || !user) return false;
-    return requiredRoles.some(role => user.role === ROLES[role]);
+    return requiredRoles.some(role => roleEquals(user.role, ROLES[role]));
   };
 
   const isAdmin = (): boolean => {
@@ -59,7 +59,7 @@ export const useRoleAccess = () => {
 
     return {
       fullName: `${user.firstName} ${user.lastName}`,
-      role: user.role || 'STUDENT',
+      role: normalizeRole(user.role) || 'STUDENT',
       identifier: user.studentId || user.employeeId || user.username || 'N/A',
     };
   };

@@ -5,6 +5,19 @@ import { AUTH_ROUTES } from '@/lib/utils/constants';
 import { env } from '@/config/env';
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 
+// Local DTO for user self-update (until OpenAPI schema includes it)
+export type UpdateProfileRequestDto = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phoneNumber?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+};
+
 // Custom query serializer to handle complex objects and arrays
 const customQuerySerializer = (query: Record<string, unknown>): string => {
   const params = new URLSearchParams();
@@ -70,6 +83,7 @@ apiClient.use({
     
     return request;
   },
+
   async onResponse({ response, request }) {
     if (DEBUG) console.log(`📥 API Response: ${response.status} ${request.url}`, {
       ok: response.ok,
@@ -153,6 +167,14 @@ export const api = {
       
     getCurrentUser: () =>
       apiClient.GET('/api/v1/auth/me'), // Fixed: was /api/v1/users/me
+  },
+
+  // User (self)
+  user: {
+    updateMe: (body: UpdateProfileRequestDto) =>
+      // The self-update endpoint is not yet in the OpenAPI schema; suppress explicit-any for this cast.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      apiClient.PUT('/api/v1/users/me' as any, { body }),
   },
 
   // Courses
@@ -292,9 +314,15 @@ export const api = {
     },
 
     registrations: {
-      getAll: () =>
-        apiClient.GET('/api/v1/admin/registrations'),
+      getAll: (params?: { page?: number; size?: number; status?: "ENROLLED" | "COMPLETED" | "DROPPED" | "PENDING" | "WITHDRAWN" | "FAILED" | "TRANSFERRED"; paymentStatus?: "PENDING" | "PAID" | "PARTIAL" | "OVERDUE" | "REFUNDED" | "CANCELLED" }) =>
+        apiClient.GET('/api/v1/admin/registrations', { params: { query: params } }),
         
+      updatePaymentStatus: (id: number, paymentStatus: "PENDING" | "PAID" | "PARTIAL" | "OVERDUE" | "REFUNDED" | "CANCELLED") =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiClient.PATCH('/api/v1/admin/registrations/{id}/payment-status' as any, {
+          params: { path: { id }, query: { paymentStatus } }
+        }),
+
       updateStatus: (id: number, status: "ENROLLED" | "COMPLETED" | "DROPPED" | "PENDING" | "WITHDRAWN" | "FAILED" | "TRANSFERRED") =>
         apiClient.PATCH('/api/v1/admin/registrations/{id}/status', { 
           params: { path: { id }, query: { status } }

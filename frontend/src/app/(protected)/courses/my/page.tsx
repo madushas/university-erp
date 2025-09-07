@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { normalizeRole } from '@/lib/utils/constants';
 import { getMyRegistrations } from '@/lib/api/registrations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,13 +38,17 @@ export default function MyCoursesPage() {
 
       try {
         setLoading(true);
-        if (user.role === 'STUDENT') {
+        const role = normalizeRole(user.role);
+        if (role === 'STUDENT') {
           const registrations = await getMyRegistrations();
-          setData(registrations);
-        } else if (user.role === 'INSTRUCTOR') {
+          const active = (registrations || []).filter(
+            (r) => ['ENROLLED', 'PENDING'].includes((r.status as string) || '')
+          );
+          setData(active);
+        } else if (role === 'INSTRUCTOR') {
           const instructorCourses = await CourseService.getMyCourses();
           setData(instructorCourses);
-        } else if (user.role === 'ADMIN') {
+        } else if (role === 'ADMIN') {
           // Admins can see all courses they manage
           const allCourses = await CourseService.getAllCourses();
           setData(allCourses);
@@ -81,9 +86,10 @@ export default function MyCoursesPage() {
     );
   }
 
-  const isStudentView = user?.role === 'STUDENT';
-  const isInstructorView = user?.role === 'INSTRUCTOR';
-  const isAdminView = user?.role === 'ADMIN';
+  const normalizedRole = normalizeRole(user?.role || null);
+  const isStudentView = normalizedRole === 'STUDENT';
+  const isInstructorView = normalizedRole === 'INSTRUCTOR';
+  const isAdminView = normalizedRole === 'ADMIN';
 
   return (
     <div className="space-y-6">

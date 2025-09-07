@@ -111,13 +111,27 @@ public class RegistrationService {
         Course course = courseRepository.findById(courseId)
             .orElseThrow(() -> new CourseNotFoundException("Course not found with id: " + courseId));
 
-        // Check if user is already enrolled
-        if (registrationRepository.existsByUserIdAndCourseId(user.getId(), courseId)) {
-            log.warn("User {} is already enrolled in course {}", username, courseId);
-            // Instead of throwing exception, return existing registration
-            Registration existingRegistration = registrationRepository.findByUserIdAndCourseId(user.getId(), courseId)
-                .orElseThrow(() -> new RuntimeException("Registration exists but not found"));
-            return dtoMapper.toRegistrationDto(existingRegistration);
+        // Check existing registration and handle re-enrollment semantics
+        java.util.Optional<Registration> existingOpt = registrationRepository.findByUserIdAndCourseId(user.getId(), courseId);
+        if (existingOpt.isPresent()) {
+            Registration existing = existingOpt.get();
+            RegistrationStatus status = existing.getStatus();
+            if (status == RegistrationStatus.ENROLLED || status == RegistrationStatus.PENDING) {
+                // Already active
+                log.warn("User {} already has active registration (status: {}) in course {}", username, status, courseId);
+                return dtoMapper.toRegistrationDto(existing);
+            }
+            if (status == RegistrationStatus.DROPPED || status == RegistrationStatus.WITHDRAWN) {
+                // Reactivate dropped/withdrawn registration
+                existing.setStatus(RegistrationStatus.ENROLLED);
+                existing.setCourseFeePaid(course.getCourseFee() != null ? course.getCourseFee() : java.math.BigDecimal.ZERO);
+                existing.setPaymentStatus(PaymentStatus.PENDING);
+                Registration saved = registrationRepository.save(existing);
+                log.info("User {} re-enrolled in course {} by reactivating existing registration", username, courseId);
+                return dtoMapper.toRegistrationDto(saved);
+            }
+            // Block re-enrollment for completed/failed/transferred etc.
+            throw new DuplicateRegistrationException("Cannot enroll: existing registration status is " + status);
         }
 
         // Validate enrollment eligibility

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { tokenManager } from '@/lib/utils/tokenManager';
+import { normalizeRole, rolesInclude } from '@/lib/utils/constants';
 
 // Route configuration with role-based access control
 interface RouteConfig {
@@ -72,9 +73,9 @@ function getUserRoles(request: NextRequest): string[] {
       
       // Support both single role and multiple roles patterns
       if (Array.isArray(userData.roles)) {
-        return userData.roles;
+        return userData.roles.map((r: string) => normalizeRole(r)).filter(Boolean) as string[];
       } else if (userData.role) {
-        return [userData.role];
+        return [normalizeRole(userData.role)].filter(Boolean) as string[];
       }
       
       return [];
@@ -83,7 +84,7 @@ function getUserRoles(request: NextRequest): string[] {
     // Fallback: try to get from headers (for API requests)
     const userHeader = request.headers.get('x-user-roles');
     if (userHeader) {
-      return userHeader.split(',').map(role => role.trim());
+      return userHeader.split(',').map(role => normalizeRole(role.trim())).filter(Boolean) as string[];
     }
     
     return [];
@@ -100,8 +101,8 @@ function hasRequiredRole(userRoles: string[], requiredRoles?: string[]): boolean
   if (!requiredRoles || requiredRoles.length === 0) {
     return true; // No specific roles required
   }
-  
-  return requiredRoles.some(role => userRoles.includes(role));
+
+  return rolesInclude(userRoles, requiredRoles);
 }
 
 /**

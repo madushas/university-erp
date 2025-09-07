@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Data
 @Builder
@@ -18,4 +19,6 @@ public class RegistrationResponse {
     private LocalDateTime registrationDate;
     private String grade;
     private String status;
+    private String paymentStatus;
+    private BigDecimal courseFeePaid;
 }

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { normalizeRole, rolesInclude } from '@/lib/utils/constants';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -175,7 +177,8 @@ export function RoleBasedNavigation({ className = '' }: RoleBasedNavigationProps
 
   const hasAccess = (roles: string[]): boolean => {
     if (!user || !user.role) return false;
-    return roles.includes(user.role);
+    const userRole = normalizeRole(user.role);
+    return rolesInclude(userRole ? [userRole] : [], roles);
   };
 
   const isActive = (href: string): boolean => {
@@ -284,7 +287,7 @@ export function RoleBasedNavigation({ className = '' }: RoleBasedNavigationProps
                 </p>
                 <div className="flex items-center space-x-1">
                   <Badge variant="secondary" className="text-xs">
-                    {user.role}
+                    {normalizeRole(user.role) || user.role}
                   </Badge>
                 </div>
               </div>
@@ -410,7 +413,7 @@ export function RoleBasedNavigation({ className = '' }: RoleBasedNavigationProps
                   </p>
                   <div className="flex items-center space-x-1 mt-1">
                     <Badge variant="secondary" className="text-xs">
-                      {user.role}
+                      {normalizeRole(user.role) || user.role}
                     </Badge>
                   </div>
                 </div>

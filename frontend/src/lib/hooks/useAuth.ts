@@ -11,7 +11,8 @@ export const useAuth = () => {
     login, 
     logout, 
     register,
-    refreshAuth
+    refreshAuth,
+    setUser
   } = useAuthContext();
 
   // Auth context handles initial check automatically
@@ -38,5 +39,6 @@ export const useAuth = () => {
     isStudent,
     isInstructor,
     refreshAuth,
+    setUser,
   };
 };
