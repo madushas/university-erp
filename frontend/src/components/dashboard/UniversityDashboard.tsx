@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, BookOpen, TrendingUp, Calendar } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { storage } from '@/lib/utils/storage';
+import { api } from '@/lib/api/generated';
 
 // Based on the actual backend AnalyticsService implementation
 interface DashboardData {
@@ -55,29 +55,12 @@ export function UniversityDashboard({ forceError }: { forceError?: boolean }) {
         throw new Error('Forced error for testing');
       }
       
-      // Get token from storage
-      const token = storage.getAccessToken();
-      if (!token) {
-        setError('No authentication token found');
-        return;
+      // Use the typed OpenAPI client (auth handled by interceptor)
+      const res = await api.analytics.getDashboard();
+      if (!res.data) {
+        throw new Error('Failed to load dashboard data');
       }
-      
-      // Use the generated OpenAPI client
-      const response = await fetch('/api/v1/analytics/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Type cast the generic response to our known structure
-      setDashboardData(data as DashboardData);
+      setDashboardData(res.data as unknown as DashboardData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');

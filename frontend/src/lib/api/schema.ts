@@ -4,6 +4,30 @@
  */
 
 export interface paths {
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current user
+         * @description Get the currently authenticated user's profile
+         */
+        get: operations["getCurrentUser"];
+        /**
+         * Update current user
+         * @description Update the currently authenticated user's profile (limited fields)
+         */
+        put: operations["updateCurrentUser"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/student/degree-audits/{id}": {
         parameters: {
             query?: never;
@@ -940,26 +964,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["updateCourseStatus"];
-        trace?: never;
-    };
-    "/api/v1/users/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get current user
-         * @description Get the currently authenticated user's profile
-         */
-        get: operations["getCurrentUser"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/v1/student/transcripts/{id}": {
@@ -2613,6 +2617,52 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UpdateProfileRequest: {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            phoneNumber?: string;
+            address?: string;
+            city?: string;
+            state?: string;
+            postalCode?: string;
+            country?: string;
+        };
+        UserResponse: {
+            /** Format: int64 */
+            id?: number;
+            username?: string;
+            email?: string;
+            firstName?: string;
+            lastName?: string;
+            /** @enum {string} */
+            role?: "STUDENT" | "INSTRUCTOR" | "ADMIN";
+            employeeId?: string;
+            studentId?: string;
+            phoneNumber?: string;
+            /** Format: date */
+            dateOfBirth?: string;
+            address?: string;
+            city?: string;
+            state?: string;
+            postalCode?: string;
+            country?: string;
+            department?: string;
+            /** Format: int32 */
+            yearOfStudy?: number;
+            /** Format: double */
+            gpa?: number;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "GRADUATED" | "PENDING_APPROVAL";
+            /** Format: date */
+            enrollmentDate?: string;
+            /** Format: date */
+            graduationDate?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
         DegreeAuditDto: {
             /** Format: int64 */
             id?: number;
@@ -3246,41 +3296,6 @@ export interface components {
             preferredLanguage?: string;
             timezone?: string;
         };
-        UserResponse: {
-            /** Format: int64 */
-            id?: number;
-            username?: string;
-            email?: string;
-            firstName?: string;
-            lastName?: string;
-            /** @enum {string} */
-            role?: "STUDENT" | "INSTRUCTOR" | "ADMIN";
-            employeeId?: string;
-            studentId?: string;
-            phoneNumber?: string;
-            /** Format: date */
-            dateOfBirth?: string;
-            address?: string;
-            city?: string;
-            state?: string;
-            postalCode?: string;
-            country?: string;
-            department?: string;
-            /** Format: int32 */
-            yearOfStudy?: number;
-            /** Format: double */
-            gpa?: number;
-            /** @enum {string} */
-            status?: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "GRADUATED" | "PENDING_APPROVAL";
-            /** Format: date */
-            enrollmentDate?: string;
-            /** Format: date */
-            graduationDate?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
         UpdateBillingStatusRequest: {
             /** @enum {string} */
             status?: "PENDING" | "PAID" | "PARTIAL" | "OVERDUE" | "CANCELLED" | "REFUNDED";
@@ -3584,10 +3599,10 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             paymentAllocations?: components["schemas"]["PaymentAllocation"][];
-            netAmount?: number;
-            pending?: boolean;
             failed?: boolean;
             successful?: boolean;
+            pending?: boolean;
+            netAmount?: number;
         };
         PaymentAllocation: {
             /** Format: int64 */
@@ -4039,6 +4054,8 @@ export interface components {
             registrationDate?: string;
             grade?: string;
             status?: string;
+            paymentStatus?: string;
+            courseFeePaid?: number;
         };
         Pageable: {
             /** Format: int32 */
@@ -4069,12 +4086,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
+            unpaged?: boolean;
             /** Format: int32 */
             pageSize?: number;
             /** Format: int32 */
             pageNumber?: number;
             paged?: boolean;
-            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -4443,6 +4460,77 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully retrieved user profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Unauthorized - Invalid or missing token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    updateCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successfully updated user profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Bad request - invalid payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Unauthorized - Invalid or missing token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
     getDegreeAudit: {
         parameters: {
             query?: never;
@@ -6638,35 +6726,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CourseResponse"];
-                };
-            };
-        };
-    };
-    getCurrentUser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successfully retrieved user profile */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponse"];
-                };
-            };
-            /** @description Unauthorized - Invalid or missing token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponse"];
                 };
             };
         };

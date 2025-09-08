@@ -201,7 +201,7 @@ export function useRegistrations(options: UseRegistrationsOptions = {}): UseRegi
       console.error('Error enrolling in course:', err);
       return null;
     }
-  }, []);
+  }, [dedupLatestByCourse]);
 
   /**
    * Drop a course

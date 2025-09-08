@@ -56,6 +56,12 @@ const getEnrollmentStatus = (enrolled: number = 0, max: number = 0) => {
   }
 };
 
+// Prefer instructorName with fallback to legacy instructor field
+const getInstructorLabel = (c: CourseDto): string => {
+  const ext = c as unknown as { instructorName?: string; instructor?: string };
+  return ext.instructorName ?? ext.instructor ?? 'TBA';
+};
+
 export default function CourseCard({
   course,
   viewMode,
@@ -92,7 +98,7 @@ export default function CourseCard({
             <div>
               <p className="text-sm text-gray-500">Instructor</p>
               <p className="text-sm font-medium text-gray-900">
-                {course.instructorName || 'TBA'}
+                {getInstructorLabel(course)}
               </p>
             </div>
 
@@ -260,7 +266,7 @@ export default function CourseCard({
       <div className="space-y-2 text-sm text-gray-500 mb-4">
         <div className="flex justify-between">
           <span className="font-medium">Instructor:</span>
-          <span className="text-gray-900">{course.instructorName || 'TBA'}</span>
+          <span className="text-gray-900">{getInstructorLabel(course)}</span>
         </div>
         <div className="flex justify-between">
           <span className="font-medium">Credits:</span>

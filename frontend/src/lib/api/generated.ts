@@ -5,19 +5,6 @@ import { AUTH_ROUTES } from '@/lib/utils/constants';
 import { env } from '@/config/env';
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 
-// Local DTO for user self-update (until OpenAPI schema includes it)
-export type UpdateProfileRequestDto = {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phoneNumber?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-  country?: string;
-};
-
 // Custom query serializer to handle complex objects and arrays
 const customQuerySerializer = (query: Record<string, unknown>): string => {
   const params = new URLSearchParams();
@@ -75,11 +62,16 @@ apiClient.use({
       console.warn(`⚠️ No token available for ${request.url}`);
     }
     
-    // Log request details for debugging
-    if (DEBUG) console.log(`📤 API Request: ${request.method} ${request.url}`, {
-      headers: Object.fromEntries(request.headers.entries()),
-      hasBody: !!request.body
-    });
+    // Log request details for debugging (scrub sensitive headers)
+    if (DEBUG) {
+      const headersToLog = Object.fromEntries(request.headers.entries());
+      if (headersToLog.Authorization) headersToLog.Authorization = 'Bearer ***';
+      if (headersToLog.authorization) headersToLog.authorization = 'Bearer ***';
+      console.log(`📤 API Request: ${request.method} ${request.url}`, {
+        headers: headersToLog,
+        hasBody: !!request.body
+      });
+    }
     
     return request;
   },
@@ -171,10 +163,9 @@ export const api = {
 
   // User (self)
   user: {
-    updateMe: (body: UpdateProfileRequestDto) =>
-      // The self-update endpoint is not yet in the OpenAPI schema; suppress explicit-any for this cast.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiClient.PUT('/api/v1/users/me' as any, { body }),
+    updateMe: (
+      body: paths['/api/v1/users/me']['put']['requestBody']['content']['application/json']
+    ) => apiClient.PUT('/api/v1/users/me', { body }),
   },
 
   // Courses
