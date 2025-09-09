@@ -291,7 +291,7 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
               <BookOpen className="mr-2 h-4 w-4" />
               Browse Courses
             </Button>
-            <Button 
+            {/* <Button 
               className="w-full justify-start" 
               variant="outline"
               onClick={() => router.push('/students/records')}
@@ -304,7 +304,7 @@ export function StudentDashboard({ forceError }: { forceError?: boolean }) {
               onClick={() => router.push('/students/audit')}
             >
               Degree Audit
-            </Button>
+            </Button> */}
           </CardContent>
         </Card>
 

@@ -314,7 +314,7 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
               <Users className="mr-2 h-4 w-4" />
               User Management
             </Button>
-            <Button
+            {/* <Button
               className="w-full justify-start"
               variant="outline"
               onClick={() => router.push('/admin/courses')}
@@ -353,7 +353,7 @@ export function AdminDashboard({ forceError }: { forceError?: boolean }) {
             >
               <Shield className="mr-2 h-4 w-4" />
               HR Management
-            </Button>
+            </Button> */}
           </CardContent>
         </Card>
 

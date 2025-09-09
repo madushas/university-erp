@@ -14,11 +14,7 @@ import {
   Users,
   FileText,
   Settings,
-  BarChart3,
   GraduationCap,
-  Calendar,
-  ClipboardList,
-  Shield,
   LogOut,
   Menu,
   X,
@@ -62,58 +58,58 @@ const navigationItems: NavigationItem[] = [
       }
     ]
   },
-  {
-    label: 'Students',
-    href: '/students',
-    icon: Users,
-    roles: ['STUDENT', 'ADMIN'],
-    children: [
-      {
-        label: 'Academic Records',
-        href: '/students/records',
-        icon: FileText,
-        roles: ['STUDENT', 'ADMIN']
-      },
-      {
-        label: 'Degree Audit',
-        href: '/students/audit',
-        icon: GraduationCap,
-        roles: ['STUDENT', 'ADMIN']
-      },
-      {
-        label: 'Applications',
-        href: '/students/applications',
-        icon: ClipboardList,
-        roles: ['STUDENT', 'ADMIN']
-      }
-    ]
-  },
-  {
-    label: 'HR Management',
-    href: '/hr',
-    icon: Shield,
-    roles: ['INSTRUCTOR', 'ADMIN'],
-    children: [
-      {
-        label: 'Employees',
-        href: '/hr/employees',
-        icon: Users,
-        roles: ['ADMIN']
-      },
-      {
-        label: 'Leave Requests',
-        href: '/hr/leave',
-        icon: Calendar,
-        roles: ['INSTRUCTOR', 'ADMIN']
-      },
-      {
-        label: 'Reports',
-        href: '/hr/reports',
-        icon: BarChart3,
-        roles: ['ADMIN']
-      }
-    ]
-  },
+  // {
+  //   label: 'Students',
+  //   href: '/students',
+  //   icon: Users,
+  //   roles: ['STUDENT', 'ADMIN'],
+  //   children: [
+  //     {
+  //       label: 'Academic Records',
+  //       href: '/students/records',
+  //       icon: FileText,
+  //       roles: ['STUDENT', 'ADMIN']
+  //     },
+  //     {
+  //       label: 'Degree Audit',
+  //       href: '/students/audit',
+  //       icon: GraduationCap,
+  //       roles: ['STUDENT', 'ADMIN']
+  //     },
+  //     {
+  //       label: 'Applications',
+  //       href: '/students/applications',
+  //       icon: ClipboardList,
+  //       roles: ['STUDENT', 'ADMIN']
+  //     }
+  //   ]
+  // },
+  // {
+  //   label: 'HR Management',
+  //   href: '/hr',
+  //   icon: Shield,
+  //   roles: ['INSTRUCTOR', 'ADMIN'],
+  //   children: [
+  //     {
+  //       label: 'Employees',
+  //       href: '/hr/employees',
+  //       icon: Users,
+  //       roles: ['ADMIN']
+  //     },
+  //     {
+  //       label: 'Leave Requests',
+  //       href: '/hr/leave',
+  //       icon: Calendar,
+  //       roles: ['INSTRUCTOR', 'ADMIN']
+  //     },
+  //     {
+  //       label: 'Reports',
+  //       href: '/hr/reports',
+  //       icon: BarChart3,
+  //       roles: ['ADMIN']
+  //     }
+  //   ]
+  // },
   {
     label: 'Administration',
     href: '/admin',
@@ -125,19 +121,19 @@ const navigationItems: NavigationItem[] = [
         href: '/admin/users',
         icon: Users,
         roles: ['ADMIN']
-      },
-      {
-        label: 'System Settings',
-        href: '/admin/system',
-        icon: Settings,
-        roles: ['ADMIN']
-      },
-      {
-        label: 'Analytics',
-        href: '/admin/analytics',
-        icon: BarChart3,
-        roles: ['ADMIN']
       }
+      // {
+      //   label: 'System Settings',
+      //   href: '/admin/system',
+      //   icon: Settings,
+      //   roles: ['ADMIN']
+      // },
+      // {
+      //   label: 'Analytics',
+      //   href: '/admin/analytics',
+      //   icon: BarChart3,
+      //   roles: ['ADMIN']
+      // }
     ]
   }
 ];

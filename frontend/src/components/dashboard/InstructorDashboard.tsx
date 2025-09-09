@@ -303,14 +303,14 @@ export function InstructorDashboard({ forceError }: { forceError?: boolean }) {
               <BookOpen className="mr-2 h-4 w-4" />
               My Classes
             </Button>
-            <Button 
+            {/* <Button 
               className="w-full justify-start" 
               variant="outline"
               onClick={() => router.push('/attendance')}
             >
               <Users className="mr-2 h-4 w-4" />
               Attendance
-            </Button>
+            </Button> */}
           </CardContent>
         </Card>
 
