@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Users, BookOpen, TrendingUp, Calendar } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { api } from '@/lib/api/generated';
+import { normalizeRole } from '@/lib/utils/constants';
 
 // Based on the actual backend AnalyticsService implementation
 interface DashboardData {
@@ -40,11 +41,20 @@ export function UniversityDashboard({ forceError }: { forceError?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const userRole = normalizeRole(user?.role) || 'STUDENT';
+  const isAdmin = userRole === 'ADMIN';
 
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       
+      // Only admins should call admin-only analytics endpoints
+      if (!isAdmin) {
+        setDashboardData(null);
+        setError(null);
+        return;
+      }
+
       // For testing purposes, allow forcing an error
       const shouldForceError = forceError === true || 
         (typeof window !== 'undefined' && 
@@ -67,7 +77,7 @@ export function UniversityDashboard({ forceError }: { forceError?: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [forceError]);
+  }, [forceError, isAdmin]);
 
   useEffect(() => {
     loadDashboardData();
@@ -125,60 +135,62 @@ export function UniversityDashboard({ forceError }: { forceError?: boolean }) {
         </Badge>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalStudents || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Active enrollments
-            </p>
-          </CardContent>
-        </Card>
+      {/* Statistics Cards (admin-only) */}
+      {isAdmin && (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardData?.totalStudents || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Active enrollments
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Courses</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.availableCourses || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              This semester
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Courses</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardData?.availableCourses || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                This semester
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalRegistrations || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              All time
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardData?.totalRegistrations || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                All time
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Departments</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalDepartments || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Active departments
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Departments</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardData?.totalDepartments || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Active departments
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

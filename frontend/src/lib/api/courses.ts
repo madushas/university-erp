@@ -39,6 +39,13 @@ export class CourseService {
         page: params?.page ?? 0,
         size: params?.size ?? 10,
         ...(params?.sortBy ? { sort: [`${params.sortBy},${params.sortDirection || 'asc'}`] } : {}),
+        ...(params?.title ? { title: params.title } : {}),
+        ...(params?.code ? { code: params.code } : {}),
+        ...(params?.department ? { department: params.department } : {}),
+        ...(params?.courseLevel ? { courseLevel: params.courseLevel } : {}),
+        ...(params?.status ? { status: params.status } : {}),
+        ...(params?.instructor ? { instructorName: params.instructor } : {}),
+        ...(params?.credits !== undefined ? { creditsMin: params.credits, creditsMax: params.credits } : {}),
       } as Record<string, unknown>;
 
       const response = await api.courses.getPaged(query as never);
@@ -110,57 +117,23 @@ export class CourseService {
     return withErrorHandling(async () => {
       console.log('🔍 CourseService.searchCourses called with:', params);
       
-      // Build flat pagination parameters expected by Spring Pageable (page, size, sort)
-      const paginationParams = {
+      // Build flat pagination + filter parameters expected by backend
+      const query = {
         page: params.page ?? 0,
         size: params.size ?? 10,
         ...(params.sortBy ? { sort: [`${params.sortBy},${params.sortDirection || 'asc'}`] } : {}),
+        ...(params.title ? { title: params.title } : {}),
+        ...(params.code ? { code: params.code } : {}),
+        ...(params.department ? { department: params.department } : {}),
+        ...(params.courseLevel ? { courseLevel: params.courseLevel } : {}),
+        ...(params.status ? { status: params.status } : {}),
+        ...(params.instructor ? { instructorName: params.instructor } : {}),
+        ...(params.credits !== undefined ? { creditsMin: params.credits, creditsMax: params.credits } : {}),
       } as Record<string, unknown>;
 
-      console.log('🌐 Making paginated API call with params:', paginationParams);
-      const response = await api.courses.getPaged(paginationParams as never);
-      
-      // Apply minimal client-side filtering for now (until backend supports full filtering)
-      let filteredCourses = response.data?.content || [];
-      
-      if (params.title) {
-        filteredCourses = filteredCourses.filter(course => 
-          course.title?.toLowerCase().includes(params.title!.toLowerCase())
-        );
-      }
-      
-      if (params.code) {
-        filteredCourses = filteredCourses.filter(course => 
-          course.code?.toLowerCase().includes(params.code!.toLowerCase())
-        );
-      }
-      
-      if (params.instructor) {
-        filteredCourses = filteredCourses.filter(course => {
-          const c = course as unknown as { instructorName?: string; instructor?: string };
-          const name = (c.instructorName || c.instructor || '').toLowerCase();
-          return name.includes(params.instructor!.toLowerCase());
-        });
-      }
-      
-      if (params.department) {
-        filteredCourses = filteredCourses.filter(course => 
-          course.department?.toLowerCase().includes(params.department!.toLowerCase())
-        );
-      }
-      
-      if (params.status) {
-        filteredCourses = filteredCourses.filter(course => 
-          course.status === params.status
-        );
-      }
-      
-      if (params.credits) {
-        filteredCourses = filteredCourses.filter(course => 
-          course.credits === params.credits
-        );
-      }
-      
+      console.log('🌐 Making paginated API call with params:', query);
+      const response = await api.courses.getPaged(query as never);
+
       // Check for API errors
       const apiError = extractApiError(response);
       if (apiError) {
@@ -171,17 +144,19 @@ export class CourseService {
         throw new Error('Failed to fetch paginated courses - no data returned');
       }
 
-      console.log('✅ Paginated courses fetched successfully:', {
+      const content = response.data.content || [];
+
+      console.log('✅ Paginated courses fetched successfully (server-filtered):', {
         totalElements: response.data.totalElements,
         totalPages: response.data.totalPages,
         currentPage: response.data.number,
         size: response.data.size,
-        filteredCount: filteredCourses.length
+        contentCount: content.length
       });
 
       return {
-        courses: filteredCourses,
-        total: response.data.totalElements ?? filteredCourses.length,
+        courses: content,
+        total: response.data.totalElements ?? content.length,
         page: response.data.number ?? 0,
         size: response.data.size ?? (params.size ?? 10),
       };

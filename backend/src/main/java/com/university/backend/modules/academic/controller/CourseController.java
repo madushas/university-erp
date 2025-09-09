@@ -49,8 +49,27 @@ public class CourseController {
     @GetMapping("/paged")
     @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN') or hasRole('INSTRUCTOR')")
     public ResponseEntity<Page<CourseDto>> getCoursesPaged(
-        @PageableDefault(size = 10, sort = "title", direction = Sort.Direction.ASC) Pageable pageable) {
-        Page<CourseDto> courses = courseService.getAllCoursesPaged(pageable);
+        @PageableDefault(size = 10, sort = "title", direction = Sort.Direction.ASC) Pageable pageable,
+        @RequestParam(required = false) String title,
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String department,
+        @RequestParam(required = false) String courseLevel,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) Integer creditsMin,
+        @RequestParam(required = false) Integer creditsMax,
+        @RequestParam(required = false, name = "instructorName") String instructorName
+    ) {
+        Page<CourseDto> courses = courseService.getCoursesPagedFiltered(
+            pageable,
+            title,
+            code,
+            department,
+            courseLevel,
+            status,
+            creditsMin,
+            creditsMax,
+            instructorName
+        );
         return ResponseEntity.ok(courses);
     }
 

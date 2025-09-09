@@ -65,8 +65,14 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
-                // Public endpoints (with /api/v1 prefix)
-                auth.requestMatchers("/api/v1/auth/**").permitAll();
+                // Public auth endpoints
+                auth.requestMatchers(
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/register",
+                    "/api/v1/auth/refresh"
+                ).permitAll();
+                // Current user endpoint requires authentication
+                auth.requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated();
                 // Swagger & OpenAPI
                 auth.requestMatchers(
                     "/swagger-ui.html",

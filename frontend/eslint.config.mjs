@@ -18,6 +18,15 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Migrated from .eslintignore
+      "src/**/__tests__/**",
+      "src/**/tests/**",
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "src/**/*.spec.ts",
+      "src/**/*.spec.tsx",
+      "e2e/**",
+      "playwright-report/**",
     ],
   },
 ];

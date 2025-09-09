@@ -18,8 +18,11 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -49,6 +52,63 @@ public class CourseService {
     public Page<CourseDto> getAllCoursesPaged(Pageable pageable) {
         log.info("Fetching courses with pagination: page {}, size {}", pageable.getPageNumber(), pageable.getPageSize());
         return courseRepository.findAll(pageable)
+            .map(dtoMapper::toCourseDto);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CourseDto> getCoursesPagedFiltered(
+        Pageable pageable,
+        String title,
+        String code,
+        String department,
+        String courseLevel,
+        String status,
+        Integer creditsMin,
+        Integer creditsMax,
+        String instructorName
+    ) {
+        log.info("Fetching courses (filtered) with pagination: page {}, size {}", pageable.getPageNumber(), pageable.getPageSize());
+
+        Specification<Course> spec = Specification.where(null);
+
+        if (title != null && !title.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("title")), "%" + title.toLowerCase() + "%"));
+        }
+        if (code != null && !code.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("code")), "%" + code.toLowerCase() + "%"));
+        }
+        if (department != null && !department.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(cb.lower(root.get("department")), department.toLowerCase()));
+        }
+        if (courseLevel != null && !courseLevel.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(cb.lower(root.get("courseLevel")), courseLevel.toLowerCase()));
+        }
+        if (status != null && !status.isBlank()) {
+            try {
+                CourseStatus cs = CourseStatus.valueOf(status.toUpperCase());
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), cs));
+            } catch (IllegalArgumentException ex) {
+                log.warn("Ignoring invalid course status filter: {}", status);
+            }
+        }
+        if (creditsMin != null) {
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("credits"), creditsMin));
+        }
+        if (creditsMax != null) {
+            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("credits"), creditsMax));
+        }
+        if (instructorName != null && !instructorName.isBlank()) {
+            spec = spec.and((root, query, cb) -> {
+                Join<Course, User> instructor = root.join("instructor", JoinType.LEFT);
+                // CONCAT(firstName, ' ', lastName) ILIKE %instructorName%
+                return cb.like(
+                    cb.lower(cb.concat(cb.concat(instructor.get("firstName"), " "), instructor.get("lastName"))),
+                    "%" + instructorName.toLowerCase() + "%"
+                );
+            });
+        }
+
+        return courseRepository.findAll(spec, pageable)
             .map(dtoMapper::toCourseDto);
     }
 
